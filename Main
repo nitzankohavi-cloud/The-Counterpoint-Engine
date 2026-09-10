@@ -1,0 +1,3846 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Counterpoint — Archival Plate</title>
+<style>
+:root {
+  --paper: #F4EEDD;
+  --paper-edge: #EDE6D8;
+  --ink: #24211D;
+  --lead: 1.55;
+  --gap: 6px;
+  --serif: "EB Garamond","Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+  --mono: ui-monospace,"SF Mono","Geist Mono","Courier New",monospace;
+  color-scheme: light;
+}
+
+:root[data-theme="obsidian"] {
+  --paper: #141517;
+  --paper-edge: #0B0C0D;
+  --ink: #E6E2D8;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html, body {
+  height: 100%; margin: 0; overflow: hidden;
+  background: var(--paper-edge); color: var(--ink);
+  font: 13px/1.45 var(--serif);
+  -webkit-font-smoothing: antialiased;
+  direction: ltr !important;
+  text-align: left !important;
+  transition: background 400ms ease, color 400ms ease;
+}
+
+#stage { position: fixed; inset: 0; overflow: hidden; cursor: pointer; }
+#stage canvas { position: absolute; inset: 0; display: block; width: 100%; height: 100%; }
+
+/* Shorts (9:16): the stage becomes a tall, narrow box centered in the
+   viewport rather than filling it -- resize() then fits the plate to COVER
+   this box (scaled up, playhead-centered) instead of containing it, so the
+   visible frame is genuinely a vertical crop of the same composition, not
+   a letterboxed 16:9 plate floating in a tall window. */
+body.shorts-mode #stage {
+  inset: auto;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(100vw, 56.25vh);
+  height: min(100vh, 177.78vw);
+  aspect-ratio: 9 / 16;
+  box-shadow: 0 0 0 100vmax color-mix(in srgb, var(--ink) 88%, black);
+}
+
+.panel {
+  background: color-mix(in srgb, var(--paper) 92%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ink) 12%, transparent);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  direction: ltr !important;
+  text-align: left !important;
+  box-shadow: 0 4px 18px -6px color-mix(in srgb, var(--ink) 14%, transparent);
+  transition: opacity 340ms ease, transform 340ms ease;
+}
+body.deck-hidden .autohide,
+body.presenting .autohide { opacity: 0; transform: translateY(10px); pointer-events: none; }
+body.deck-hidden #deck, body.presenting #deck { transform: translateX(-50%) translateY(10px); }
+
+#deck {
+  position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%);
+  z-index: 6; max-width: min(1080px, calc(100vw - 40px));
+  border-radius: 9999px; padding: 7px 18px;
+  display: flex; align-items: center; gap: 9px;
+  box-shadow: 0 18px 40px -22px color-mix(in srgb, var(--ink) 45%, transparent);
+}
+#deck-macro {
+  width: 150px; height: 22px; border-radius: 11px; overflow: hidden;
+  cursor: pointer; flex: 0 0 auto;
+  background: color-mix(in srgb, var(--ink) 5%, transparent);
+}
+#deck-macro canvas { display: block; width: 100%; height: 22px; }
+
+button, select {
+  border: 1px solid color-mix(in srgb, var(--ink) 12%, transparent);
+  background: color-mix(in srgb, var(--ink) 6%, transparent);
+  color: var(--ink); border-radius: 9999px;
+  padding: 5px 12px; font: inherit; font-size: 11.5px; cursor: pointer;
+  white-space: nowrap; outline: none;
+  transition: background 160ms ease, opacity 160ms ease;
+}
+select { padding: 4px 8px; font-family: var(--mono); font-size: 11px; }
+button:hover:not(:disabled), select:hover { background: color-mix(in srgb, var(--ink) 13%, transparent); }
+button:disabled { opacity: 0.32; cursor: default; }
+button[aria-pressed="false"] { opacity: 0.45; }
+.icon { width: 30px; padding: 5px 0; text-align: center; font-size: 12px; line-height: 1; }
+.play { min-width: 64px; font-variant: small-caps; letter-spacing: 0.05em; font-weight: 600; }
+.time { font: 11px var(--mono); min-width: 78px; text-align: center; opacity: 0.6; }
+
+.scrub {
+  flex: 1 1 120px; min-width: 70px; height: 4px; border-radius: 2px;
+  background: color-mix(in srgb, var(--ink) 14%, transparent);
+  position: relative; cursor: pointer; touch-action: none;
+}
+.scrub-fill {
+  position: absolute; inset: 0; border-radius: 2px;
+  background: color-mix(in srgb, var(--ink) 65%, transparent);
+  transform-origin: left center; transform: scaleX(0); will-change: transform;
+}
+.deck-sep { width: 1px; height: 16px; background: color-mix(in srgb, var(--ink) 14%, transparent); flex: 0 0 auto; }
+
+#status {
+  position: fixed; left: 50%; transform: translateX(-50%); bottom: 72px; z-index: 5;
+  font: 11px var(--mono); text-align: center; pointer-events: none;
+  opacity: 0.65; max-width: 70vw;
+}
+#status.error { color: #B93826; opacity: 1; }
+#dropveil {
+  position: fixed; inset: 0; display: none; place-items: center; z-index: 20;
+  background: color-mix(in srgb, var(--paper) 88%, transparent);
+  font-size: 15px; pointer-events: none; font-style: italic;
+}
+body.dropping #dropveil { display: grid; }
+#fatal {
+  position: fixed; inset: 0; display: none; place-items: center; text-align: center;
+  background: var(--paper); padding: 40px; z-index: 30; font-size: 14px; opacity: 0.75;
+}
+:focus-visible { outline: 1px solid color-mix(in srgb, var(--ink) 50%, transparent); outline-offset: 3px; }
+
+@media (prefers-reduced-motion: reduce) { .panel { transition: none; } }
+</style>
+</head>
+<body>
+<main id="stage">
+  <canvas id="layer-static"></canvas>
+  <canvas id="layer-dynamic"></canvas>
+</main>
+<div id="status" class="autohide"></div>
+<section id="deck" class="panel autohide">
+  <div id="deck-macro"><canvas id="layer-minimap"></canvas></div>
+  <div id="deck-controls" style="display:contents"></div>
+</section>
+<div id="dropveil" aria-hidden="true">Drop a MIDI file</div>
+<div id="fatal"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/tone/15.0.4/Tone.js" crossorigin="anonymous"></script>
+<script>
+"use strict";
+
+/* ==========================================================================
+ * 1. TEMPO MAP
+ * ========================================================================== */
+
+function buildTempoMap(events, ppq) {
+  const sorted = [...events].sort((a, b) => a.tick - b.tick);
+  if (sorted.length === 0 || sorted[0].tick > 0) sorted.unshift({ tick: 0, usPerQuarter: 500000 });
+  const map = [];
+  let sec = 0;
+  for (let i = 0; i < sorted.length; i++) {
+    const ev = sorted[i];
+    if (i > 0) {
+      const prev = sorted[i - 1];
+      sec += ((ev.tick - prev.tick) * prev.usPerQuarter) / ppq / 1e6;
+    }
+    if (map.length > 0 && map[map.length - 1].tick === ev.tick) map.pop();
+    map.push({ tick: ev.tick, sec, usPerQuarter: ev.usPerQuarter });
+  }
+  return map;
+}
+
+function seekByTick(map, tick) {
+  let lo = 0, hi = map.length - 1;
+  while (lo < hi) {
+    const mid = (lo + hi + 1) >> 1;
+    if (map[mid].tick <= tick) lo = mid; else hi = mid - 1;
+  }
+  return lo;
+}
+
+function seekBySec(map, sec) {
+  let lo = 0, hi = map.length - 1;
+  while (lo < hi) {
+    const mid = (lo + hi + 1) >> 1;
+    if (map[mid].sec <= sec) lo = mid; else hi = mid - 1;
+  }
+  return lo;
+}
+
+function tickToSec(map, ppq, tick) {
+  const p = map[seekByTick(map, tick)];
+  return p.sec + ((tick - p.tick) * p.usPerQuarter) / ppq / 1e6;
+}
+
+function secToTick(map, ppq, sec) {
+  const p = map[seekBySec(map, sec)];
+  return p.tick + ((sec - p.sec) * 1e6 * ppq) / p.usPerQuarter;
+}
+
+/* ==========================================================================
+ * 2. THEME ENGINE — Curated Inks & Crisp Archival Rag
+ * ========================================================================== */
+
+const THEMES = [
+  {
+    id: "vellum",
+    name: "Archival Vellum",
+    // Four tones, not two: three for the macro mottling across the sheet's
+    // own surface (a real hide/rag sheet is never one flat colour), and a
+    // fourth, deeper patina the perimeter vignette shades into -- distinct
+    // A single continuous sheet now, not a multi-stop material blend -- see
+    // the extensive comment on makePaper for why that changed. paperMid is
+    // kept as a very small constant tint, not a spatially-varying stop;
+    // paperDark is no longer used by the algorithm (kept defined so nothing
+    // elsewhere that reads the theme object breaks) and paperEdge remains
+    // the vignette-only tone, confined strictly to the outer margin.
+    paper: "#F4EEDD",      // warm antique vellum -- the sheet's one true tone
+    paperMid: "#EDE5D2",   // a whisper of secondary tint, applied uniformly
+    paperDark: "#E5D7BC",
+    paperEdge: "#D8C7A4",  // perimeter patina -- outer 20% only
+    ink: "#24211D",
+    rulerOctave: "rgba(145, 135, 120, 0.18)",
+    rulerBarMajor: "rgba(145, 135, 120, 0.18)",
+    rulerBarTick: "rgba(145, 135, 120, 0.28)",
+    rulerNumber: "rgba(145, 135, 120, 0.42)",
+    isDark: false,
+    // Four historical pigments, not a chart palette: madder/terracotta, oxidized
+    // verdigris, dyer's indigo, and iron-gall bistre. Each is a real ink or
+    // pigment a Baroque copyist could have had on the desk. They are also
+    // chosen to sit far apart in BOTH hue and lightness -- bistre reads as
+    // near-black, indigo is the only blue, verdigris the only green, terracotta
+    // the only warm red -- so the four stay instantly distinguishable even
+    // before a viewer has learned the register convention.
+    voices: ["#A6572E", "#3F7A3A", "#2B3D72", "#2A2420", "#6B3B5A", "#8C6A1E"],
+  },
+  {
+    id: "obsidian",
+    name: "Japanese Sumi / Obsidian",
+    // Same four-tone structure, at ink-stone magnitudes: a lit stone has real
+    // material variation too, just far subtler than parchment fibre.
+    paper: "#151619",
+    paperMid: "#111215",
+    paperDark: "#0E0F11",
+    paperEdge: "#0B0C0D",
+    ink: "#E6E2D8",
+    rulerOctave: "rgba(90, 94, 104, 0.20)",
+    rulerBarMajor: "rgba(90, 94, 104, 0.18)",
+    rulerBarTick: "rgba(90, 94, 104, 0.28)",
+    rulerNumber: "rgba(150, 154, 164, 0.45)",
+    isDark: true,
+    // Same four pigment identities, lifted in value rather than pushed into
+    // saturation -- a lit ink stone, not a screen glow. Bass becomes the
+    // warmest neutral (bone) rather than the darkest hue, since "darkest"
+    // reads as invisible on a near-black ground; distinctness now comes from
+    // being the least colourful voice instead of the most colourful.
+    voices: ["#C97A52", "#5FA379", "#6E8FC4", "#C9BFA8", "#9B6E92", "#C9A227"],
+  },
+];
+const DEFAULT_THEME = "vellum";
+let activeTheme = THEMES[0];
+
+const VOICE_LABELS = ["Soprano", "Alto", "Tenor", "Bass", "Quintus", "Sextus"];
+const labelForIndex = (i) => VOICE_LABELS[i] || `Voice ${i + 1}`;
+
+function parseHex(hex) {
+  const n = parseInt(String(hex).slice(1), 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+const clamp255 = (x) => Math.max(0, Math.min(255, Math.round(x)));
+const rgbStr = (r, g, b) => `rgb(${clamp255(r)},${clamp255(g)},${clamp255(b)})`;
+const rgbaStr = (r, g, b, a) => `rgba(${clamp255(r)},${clamp255(g)},${clamp255(b)},${a})`;
+
+function mix(c1, c2, k) {
+  return [c1[0] + (c2[0] - c1[0]) * k, c1[1] + (c2[1] - c1[1]) * k, c1[2] + (c2[2] - c1[2]) * k];
+}
+
+function voiceRamp(theme, n) {
+  const out = [];
+  for (let i = 0; i < n; i++) {
+    const idx = n <= 2 ? i * 2 : i;
+    out.push(parseHex(theme.voices[Math.min(idx, theme.voices.length - 1)]));
+  }
+  return out;
+}
+
+function stateColors(rgb, theme) {
+  const paper = parseHex(theme.paper);
+  const ink = parseHex(theme.ink);
+  return {
+    base: rgbStr(...rgb),
+    // Raw channels, kept alongside the string forms so effects that need to
+    // mix toward another colour (pedal-point pooling, below) never have to
+    // re-parse an "rgb(...)" string back into numbers every frame.
+    rgb,
+    resting: rgbaStr(rgb[0], rgb[1], rgb[2], theme.isDark ? 0.65 : 0.72),
+    silent: rgbStr(...mix(paper, rgb, theme.isDark ? 0.30 : 0.22)),
+  };
+}
+
+function registerWeight(index, count) {
+  if (count <= 1) return { width: 1 };
+  const k = index / (count - 1);
+  return { width: 0.96 + k * 0.14 };
+}
+
+function applyVoicePalettes(score, theme) {
+  const t = theme || activeTheme;
+  const ramp = voiceRamp(t, Math.max(1, score.voices.length));
+  score.voices.forEach((voice, i) => {
+    const weight = registerWeight(i, score.voices.length);
+    voice.palette = Object.assign({ label: voice.label }, stateColors(ramp[i], t));
+    voice.weight = weight;
+  });
+  return score;
+}
+
+function environmentFor(theme) {
+  const [r, g, b] = parseHex(theme.ink);
+  const a = (x) => rgbaStr(r, g, b, x);
+  return {
+    id: theme.id,
+    isDark: theme.isDark,
+    paper: theme.paper,
+    paperMid: theme.paperMid,
+    paperDark: theme.paperDark,
+    paperEdge: theme.paperEdge,
+    ink: a(0.92),
+    inkSoft: a(0.55),
+    ruleOctave: theme.rulerOctave,
+    ruleBarMajor: theme.rulerBarMajor,
+    ruleBarTick: theme.rulerBarTick,
+    ruleNumber: theme.rulerNumber,
+    label: a(0.35),
+    labelFont: '10px "EB Garamond", Georgia, serif',
+    barNumberFont: 'italic 9.5px "EB Garamond", Georgia, serif',
+    playhead: a(0.68),
+    minimapInk: a(0.16),
+    minimapCursor: a(0.55),
+    cartouche: a(0.76),
+    consoleFaint: a(0.34),
+    glow: `rgba(${clamp255(r)},${clamp255(g)},${clamp255(b)},`,
+    accent: theme.ink,
+    blend: theme.isDark ? "screen" : "multiply",
+  };
+}
+
+/* ==========================================================================
+ * 2b. AUTHENTIC ARCHIVAL VELLUM (Multi-scale Pulp Tooth & Rag Fibers)
+ * ========================================================================== */
+
+/**
+ * A single continuous sheet -- not a multi-stop material blend.
+ *
+ * An earlier pass here used a genuine 3-stop macro-cloud gradient (a slow
+ * spatially-coherent noise field selecting a position along ivory -> flax ->
+ * oatmeal) specifically to fix a "flat, lifeless" complaint. Seen rendered,
+ * that cloud read as mottling -- cowhide, camouflage, a stained sheet -- not
+ * as parchment. The lesson is not "texture is good" or "texture is bad," it
+ * is that MACRO spatial variation and MICRO surface grain are two entirely
+ * different visual phenomena, and only one of them belongs on a sheet meant
+ * to read as a single continuous material: fine grain says "paper"; visible
+ * macro blotching says "hide" or "stain," no matter how gently it blends.
+ *
+ * So: the body is one dominant tone with a single, spatially UNIFORM tint
+ * mixed in at a fixed ratio (never a noise field choosing how much), plus a
+ * sub-pixel analog tooth (+-2.5 RGB) that gives it surface without ever
+ * suggesting a shape underneath. The vignette is confined strictly to the
+ * outer 20% of the sheet, so the aged edge reads as a frame around a flat
+ * page rather than a gradient wash across the whole thing.
+ */
+function makePaper(w, h) {
+  const cw = Math.max(1, Math.ceil(w));
+  const ch = Math.max(1, Math.ceil(h));
+  const c = document.createElement("canvas");
+  c.width = cw; c.height = ch;
+  const g = c.getContext("2d");
+  const img = g.createImageData(cw, ch);
+  const d = img.data;
+  const base = parseHex(THEME.paper);
+  const mid = parseHex(THEME.paperMid);
+  const edge = parseHex(THEME.paperEdge);
+
+  let seed = 0x2f6e2b1 >>> 0;
+  const rnd = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296);
+
+  const cx = cw / 2, cy = ch / 2;
+  const maxR = Math.hypot(cx, cy);
+  // A fixed, uniform 12% lean toward the secondary tone -- the "whisper of
+  // tint" the theme comment promises. Constant everywhere; nothing here
+  // varies by position, which is the entire point.
+  const TINT = 0.12;
+  const sr = base[0] + (mid[0] - base[0]) * TINT;
+  const sg = base[1] + (mid[1] - base[1]) * TINT;
+  const sb = base[2] + (mid[2] - base[2]) * TINT;
+  // The vignette must do nothing at all until 80% of the way to the corner,
+  // then ramp over the final 20% -- "confined to the outermost 20%," not a
+  // gradient that starts at the centre and happens to be strongest at the
+  // edge. smoothstep gives that ramp a soft shoulder rather than a seam.
+  const VIGNETTE_START = 0.8;
+  const smoothstep01 = (x) => (x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x));
+
+  for (let y = 0; y < ch; y++) {
+    for (let x = 0; x < cw; x++) {
+      const i = (y * cw + x) * 4;
+
+      // Sub-pixel analog tooth: the ONLY spatial variation in the sheet
+      // itself. Three averaged samples keep it a soft grain rather than
+      // salt-and-pepper noise, at a fraction of the old amplitude.
+      const tooth = ((rnd() + rnd() + rnd()) / 3 - 0.5) * 5.0;
+
+      const distFrac = Math.hypot(x - cx, y - cy) / maxR;
+      const k = smoothstep01((distFrac - VIGNETTE_START) / (1 - VIGNETTE_START)) * 0.42;
+
+      d[i]     = clamp255(sr + (edge[0] - sr) * k + tooth);
+      d[i + 1] = clamp255(sg + (edge[1] - sg) * k + tooth * 0.95);
+      d[i + 2] = clamp255(sb + (edge[2] - sb) * k + tooth * 0.88);
+      d[i + 3] = 255;
+    }
+  }
+  g.putImageData(img, 0, 0);
+
+  // Foxing: three to six soft warm spots, sized like real age-spotting, never
+  // more saturated than a faint rust wash. Skipped on the dark stock -- sumi
+  // ink stone does not fox.
+  if (!THEME.isDark) {
+    g.save();
+    const foxCount = 3 + Math.floor(rnd() * 4);
+    for (let f = 0; f < foxCount; f++) {
+      const fx = rnd() * cw, fy = rnd() * ch;
+      const fr = 14 + rnd() * 30;
+      const grad = g.createRadialGradient(fx, fy, 0, fx, fy, fr);
+      grad.addColorStop(0, `rgba(150, 108, 62, ${0.05 + rnd() * 0.035})`);
+      grad.addColorStop(1, "rgba(150, 108, 62, 0)");
+      g.fillStyle = grad;
+      g.beginPath();
+      g.arc(fx, fy, fr, 0, Math.PI * 2);
+      g.fill();
+    }
+    g.restore();
+  }
+
+  // Rag fibers: whisper-quiet and genuinely fine -- 0.35px lines, sparse
+  // (one fibre per ~12000 sq. px rather than the old ~6200), at 7% opacity
+  // on the light stock. This is meant to feel embedded in the pulp, not
+  // scattered on top of it; if you can count individual fibres at a glance,
+  // it is too strong.
+  g.save();
+  g.lineWidth = 0.35;
+  g.lineCap = "round";
+  const numFibers = Math.round((cw * ch) / 12000);
+  for (let f = 0; f < numFibers; f++) {
+    const fx = rnd() * cw;
+    const fy = rnd() * ch;
+    const flen = 6 + rnd() * 13;
+    const fAngle = rnd() * Math.PI * 2;
+    const fCurve = (rnd() - 0.5) * 6;
+    const fOpacity = THEME.isDark ? (0.05 + rnd() * 0.03) : (0.055 + rnd() * 0.03);
+
+    g.strokeStyle = THEME.isDark
+      ? `rgba(230, 226, 216, ${fOpacity.toFixed(3)})`
+      : `rgba(92, 70, 47, ${fOpacity.toFixed(3)})`;
+    g.beginPath();
+    g.moveTo(fx, fy);
+    const midX = fx + Math.cos(fAngle) * (flen * 0.5) + Math.sin(fAngle) * fCurve;
+    const midY = fy + Math.sin(fAngle) * (flen * 0.5) - Math.cos(fAngle) * fCurve;
+    const endX = fx + Math.cos(fAngle) * flen;
+    const endY = fy + Math.sin(fAngle) * flen;
+    g.quadraticCurveTo(midX, midY, endX, endY);
+    g.stroke();
+  }
+  g.restore();
+
+  return c;
+}
+
+/* ==========================================================================
+ * 3. SCORE NORMALIZATION & DEDUPLICATED TIME SIGNATURES
+ * ========================================================================== */
+
+function buildScore(input) {
+  const ppq = input.ppq;
+  const tempoMap = buildTempoMap(input.tempos, ppq);
+  let nextId = 0, pitchLo = Infinity, pitchHi = -Infinity, durTick = 0;
+
+  const voices = input.voices.map((raw, voiceId) => {
+    const notes = new Array(raw.notes.length);
+    let lo = Infinity, hi = -Infinity;
+    for (let i = 0; i < raw.notes.length; i++) {
+      const n = raw.notes[i];
+      const endTick = n.tick + n.durTick;
+      notes[i] = {
+        id: nextId++, voiceId,
+        startTick: n.tick, durTick: n.durTick,
+        startSec: tickToSec(tempoMap, ppq, n.tick),
+        endSec: tickToSec(tempoMap, ppq, endTick),
+        midi: n.midi, vel: n.vel,
+      };
+      if (n.midi < lo) lo = n.midi;
+      if (n.midi > hi) hi = n.midi;
+      if (endTick > durTick) durTick = endTick;
+    }
+    notes.sort((a, b) => a.startSec - b.startSec || a.midi - b.midi);
+    if (lo < pitchLo) pitchLo = lo;
+    if (hi > pitchHi) pitchHi = hi;
+    return {
+      id: voiceId, label: raw.label, palette: null, notes,
+      lo: isFinite(lo) ? lo : 60, hi: isFinite(hi) ? hi : 60,
+    };
+  });
+
+  if (!isFinite(pitchLo)) { pitchLo = 48; pitchHi = 72; }
+
+  const score = {
+    name: input.name, ppq, tempoMap, voices,
+    measures: buildMeasures(input.timeSignatures, tempoMap, ppq, durTick),
+    durTick, durSec: tickToSec(tempoMap, ppq, durTick),
+    pitchLo: pitchLo - 1,
+    pitchHi: pitchHi + 1,
+    noteCount: nextId,
+  };
+  return applyVoicePalettes(score);
+}
+
+function buildMeasures(sigs, tempoMap, ppq, durTick) {
+  const rawList = sigs && sigs.length ? [...sigs].sort((a, b) => a.tick - b.tick) : [];
+  
+  // Clean deduplication across tracks
+  const list = [];
+  for (let r = 0; r < rawList.length; r++) {
+    if (list.length > 0 && list[list.length - 1].tick === rawList[r].tick) {
+      list[list.length - 1] = rawList[r];
+    } else {
+      list.push(rawList[r]);
+    }
+  }
+
+  if (list.length === 0 || list[0].tick > 0) list.unshift({ tick: 0, numerator: 4, denominator: 4 });
+  const measures = [];
+  let index = 0;
+  for (let s = 0; s < list.length; s++) {
+    const sig = list[s];
+    const until = s + 1 < list.length ? list[s + 1].tick : durTick;
+    const ticksPerBar = (sig.numerator * (4 / sig.denominator) * ppq) | 0;
+    if (ticksPerBar <= 0) continue;
+    for (let t = sig.tick; t < until; t += ticksPerBar) {
+      measures.push({
+        index: index++, startTick: t, startSec: tickToSec(tempoMap, ppq, t),
+        numerator: sig.numerator, denominator: sig.denominator,
+      });
+    }
+  }
+  return measures;
+}
+
+/* ==========================================================================
+ * 4. MIDI INGESTION
+ * ========================================================================== */
+
+class MidiShapeError extends Error {}
+
+function readSmf(buffer) {
+  const view = new DataView(buffer);
+  if (buffer.byteLength < 14) throw new MidiShapeError("File is too short to be a MIDI file.");
+  if (str4(view, 0) !== "MThd") throw new MidiShapeError("Not a MIDI file — no MThd header found.");
+
+  const format = view.getUint16(8);
+  const ntrks = view.getUint16(10);
+  const division = view.getUint16(12);
+  if (division & 0x8000) throw new MidiShapeError("SMPTE timecode files are not supported.");
+  const ppq = division;
+  // A zero (or otherwise non-positive) division field divides by zero in
+  // every downstream tempo calculation (tickToSec/secToTick), which
+  // propagates as NaN through the whole pipeline silently -- canvas drawing
+  // calls with NaN coordinates simply draw nothing, so the failure mode is
+  // "file reports success but the plate stays blank," with no error anyone
+  // can act on. Reject it here instead, where the cause is still known.
+  if (!(ppq > 0)) throw new MidiShapeError("Invalid MIDI file: ticks-per-quarter-note is zero.");
+
+  let pos = 8 + view.getUint32(4);
+  const tracks = [];
+  const tempos = [];
+  const timeSignatures = [];
+
+  for (let ti = 0; ti < ntrks && pos + 8 <= buffer.byteLength; ti++) {
+    if (str4(view, pos) !== "MTrk") break;
+    const len = view.getUint32(pos + 4);
+    const end = Math.min(buffer.byteLength, pos + 8 + len);
+    let p = pos + 8;
+    let tick = 0;
+    let running = 0;
+    let name = "";
+    const open = new Map();
+    const notes = [];
+    const channels = new Set();
+
+    while (p < end) {
+      const dt = readVarInt(view, p); p = dt.next; tick += dt.value;
+      let status = view.getUint8(p);
+      if (status < 0x80) {
+        if (!running) throw new MidiShapeError(`Data byte with no running status.`);
+        status = running;
+      } else {
+        p++;
+        running = status < 0xf0 ? status : 0;
+      }
+
+      if (status === 0xff) {
+        const type = view.getUint8(p); p++;
+        const ln = readVarInt(view, p); p = ln.next;
+        const dataAt = p;
+        if (type === 0x51 && ln.value === 3) {
+          tempos.push({
+            tick,
+            usPerQuarter: (view.getUint8(dataAt) << 16) | (view.getUint8(dataAt + 1) << 8) | view.getUint8(dataAt + 2),
+          });
+        } else if (type === 0x58 && ln.value >= 2) {
+          timeSignatures.push({
+            tick, numerator: view.getUint8(dataAt),
+            denominator: Math.pow(2, view.getUint8(dataAt + 1)),
+          });
+        } else if (type === 0x03) {
+          name = readAscii(view, dataAt, ln.value);
+        }
+        p = dataAt + ln.value;
+        if (type === 0x2f) break;
+        continue;
+      }
+
+      if (status === 0xf0 || status === 0xf7) {
+        const ln = readVarInt(view, p); p = ln.next + ln.value;
+        continue;
+      }
+
+      const kind = status & 0xf0;
+      const channel = status & 0x0f;
+      if (kind === 0x90 || kind === 0x80) {
+        const key = view.getUint8(p); const vel = view.getUint8(p + 1); p += 2;
+        channels.add(channel);
+        const id = channel * 128 + key;
+        const isOnset = kind === 0x90 && vel > 0;
+        if (isOnset) {
+          if (open.has(id)) closeNote(open, notes, id, tick);
+          open.set(id, { tick, midi: key, vel: vel / 127, channel });
+        } else {
+          closeNote(open, notes, id, tick);
+        }
+      } else if (kind === 0xa0 || kind === 0xb0 || kind === 0xe0) {
+        p += 2;
+      } else if (kind === 0xc0 || kind === 0xd0) {
+        p += 1;
+      }
+    }
+    for (const id of [...open.keys()]) closeNote(open, notes, id, tick + 1);
+
+    tracks.push({ name, notes, channels: [...channels] });
+    pos = pos + 8 + len;
+  }
+
+  return { format, ppq, tracks, tempos, timeSignatures };
+}
+
+function closeNote(open, notes, id, tick) {
+  const on = open.get(id);
+  if (!on) return;
+  open.delete(id);
+  notes.push({ tick: on.tick, durTick: Math.max(1, tick - on.tick), midi: on.midi, vel: on.vel, channel: on.channel });
+}
+
+function readVarInt(view, p) {
+  let value = 0, byte;
+  do { byte = view.getUint8(p++); value = (value << 7) | (byte & 0x7f); } while (byte & 0x80);
+  return { value, next: p };
+}
+function str4(view, p) {
+  return String.fromCharCode(view.getUint8(p), view.getUint8(p + 1), view.getUint8(p + 2), view.getUint8(p + 3));
+}
+function readAscii(view, p, len) {
+  let s = "";
+  for (let i = 0; i < len; i++) s += String.fromCharCode(view.getUint8(p + i));
+  return s.trim();
+}
+
+function medianPitch(notes) {
+  if (notes.length === 0) return 0;
+  const sorted = notes.map((n) => n.midi).sort((a, b) => a - b);
+  const mid = sorted.length >> 1;
+  return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+}
+
+function ingestMidi(buffer, opts) {
+  opts = opts || {};
+  let smf;
+  try {
+    smf = readSmf(buffer);
+  } catch (err) {
+    if (err instanceof MidiShapeError) throw err;
+    throw new MidiShapeError(`Could not parse MIDI (${err && err.message}).`);
+  }
+
+  const voiced = smf.tracks.filter((t) => t.notes.length > 0);
+  if (voiced.length === 0) throw new MidiShapeError("No notes found in file.");
+
+  let layers = voiced;
+  if (voiced.length === 1 && voiced[0].channels.length > 1) {
+    const split = voiced[0].channels
+      .map((ch) => ({
+        name: `Channel ${ch}`,
+        notes: voiced[0].notes.filter((n) => n.channel === ch),
+        channels: [ch],
+      }))
+      .filter((l) => l.notes.length > 0);
+    if (split.length > 1) layers = split;
+  }
+
+  const singleLayer = layers.length === 1;
+  // Ordered by MEDIAN pitch rather than mean: a voice that briefly leaps into
+  // an extreme register (a passing high note, a low pedal point) shouldn't
+  // drag its whole-piece average past a neighbouring voice's. Median is far
+  // less sensitive to that kind of short excursion.
+  //
+  // This is still fundamentally a statistical guess, not a structural fact,
+  // and it has a real limit: genuine voice-crossing -- alto and tenor lines
+  // that trade register for a passage, a hallmark of exactly the invertible
+  // counterpoint Bach writes constantly -- can leave two voices' medians on
+  // the "wrong" side of each other. There is no way to resolve that without
+  // real voice-separation analysis (tracking which line is contrapuntally
+  // continuous through a crossing, not just where notes sit on average).
+  const ordered = layers
+    .map((t) => ({ t, med: medianPitch(t.notes) }))
+    .sort((a, b) => b.med - a.med)
+    .map((x) => x.t);
+
+  const voices = ordered.map((track, i) => ({
+    label: (opts.labels && opts.labels[i]) || track.name || (singleLayer ? "All voices" : labelForIndex(i)),
+    notes: track.notes.map((n) => ({ tick: n.tick, durTick: n.durTick, midi: n.midi, vel: n.vel })),
+  }));
+
+  const score = buildScore({
+    name: opts.name || "Untitled",
+    ppq: smf.ppq,
+    tempos: smf.tempos,
+    timeSignatures: smf.timeSignatures,
+    voices,
+  });
+
+  return {
+    score,
+    diagnostics: {
+      format: smf.format,
+      trackCount: smf.tracks.length,
+      voicedTrackCount: layers.length,
+      voiceCount: score.voices.length,
+      noteCount: score.noteCount,
+      ppq: smf.ppq,
+      singleLayer,
+    },
+  };
+}
+
+function validateScore(score) {
+  let maxRoundTripTicks = 0, maxBreakpointDev = 0, maxDurationTicks = 0, notes = 0;
+  for (const voice of score.voices) {
+    for (const n of voice.notes) {
+      notes++;
+      const back = secToTick(score.tempoMap, score.ppq, n.startSec);
+      maxRoundTripTicks = Math.max(maxRoundTripTicks, Math.abs(back - n.startTick));
+      // The old check only round-tripped startSec/startTick. A tempo-map bug
+      // that specifically corrupted DURATIONS (rather than onsets) -- for
+      // instance an off-by-one in how a tempo change mid-note is integrated
+      // -- could pass every previous check while still playing every note
+      // for the wrong length.
+      const endBack = secToTick(score.tempoMap, score.ppq, n.endSec);
+      const endTick = n.startTick + n.durTick;
+      maxDurationTicks = Math.max(maxDurationTicks, Math.abs(endBack - endTick));
+    }
+  }
+  for (const p of score.tempoMap) {
+    maxBreakpointDev = Math.max(maxBreakpointDev, Math.abs(tickToSec(score.tempoMap, score.ppq, p.tick) - p.sec));
+  }
+  return {
+    notes,
+    voices: score.voices.map((v) => v.notes.length).join("/"),
+    durSec: +score.durSec.toFixed(4),
+    maxRoundTripTicks,
+    maxDurationTicks,
+    maxBreakpointDev,
+    ok: maxRoundTripTicks < 1e-3 && maxDurationTicks < 1e-3 && maxBreakpointDev < 1e-9,
+  };
+}
+
+/* ==========================================================================
+ * 5. MOTIF MATCHER
+ * ========================================================================== */
+
+const MOTIF = { EPISODE: 0, SUBJECT: 1, ANSWER: 2, COUNTERSUBJECT: 3 };
+const MOTIF_NAME = { 0: "episode", 1: "subject", 2: "answer", 3: "countersubject" };
+
+const MOTIF_TUNING = {
+  intervalBudget: 2, maxDeviantPositions: 2, rhythmTolerance: 0.22,
+  maxRhythmViolations: 1, minCompleteness: 0.6, maxPatternNotes: 24,
+};
+
+function analyze(score, tuning) {
+  const cfg = Object.assign({}, MOTIF_TUNING, tuning || {});
+  const total = score.noteCount;
+  const empty = {
+    subject: null, countersubject: null, occurrences: [],
+    motifOf: new Uint8Array(total), occurrenceOf: new Int32Array(total).fill(-1),
+    byTime: [], handoffs: [], spans: [],
+  };
+
+  const entries = score.voices
+    .filter((v) => v.notes.length > 0)
+    .map((v) => ({ voice: v, at: v.notes[0].startSec }))
+    .sort((a, b) => a.at - b.at);
+  if (entries.length < 2) return empty;
+
+  const first = entries[0].voice;
+  const secondEntry = entries[1].at;
+
+  const subjectCount = takeUntil(first.notes, 0, secondEntry, cfg.maxPatternNotes);
+  if (subjectCount < 4) return empty;
+  const subject = patternFrom(first.notes, 0, subjectCount);
+
+  const csStart = indexAtOrAfter(first.notes, secondEntry);
+  const csLimit = entries[2] ? entries[2].at : Infinity;
+  const csCount = takeUntil(first.notes, csStart, csLimit, cfg.maxPatternNotes);
+  const countersubject = csCount >= 4 ? patternFrom(first.notes, csStart, csCount) : null;
+
+  const candidates = [];
+  for (const voice of score.voices) {
+    collect(candidates, voice.id, voice.notes, subject, cfg, false, null);
+    collect(candidates, voice.id, voice.notes, subject, cfg, true, null);
+    if (countersubject) collect(candidates, voice.id, voice.notes, countersubject, cfg, false, MOTIF.COUNTERSUBJECT);
+  }
+
+  const occurrences = selectNonOverlapping(candidates, score);
+  const notesByVoice = new Map(score.voices.map((v) => [v.id, v.notes]));
+
+  const motifOf = new Uint8Array(total);
+  const occurrenceOf = new Int32Array(total).fill(-1);
+  occurrences.forEach((occ, i) => {
+    const notes = notesByVoice.get(occ.voiceId);
+    if (!notes) return;
+    for (let j = lowerBoundSec(notes, occ.startSec); j < notes.length; j++) {
+      const n = notes[j];
+      if (n.startSec > occ.endSec + 1e-9) break;
+      motifOf[n.id] = occ.type;
+      occurrenceOf[n.id] = i;
+    }
+  });
+
+  const byTime = [...occurrences].sort((a, b) => a.startSec - b.startSec);
+  return {
+    subject, countersubject, occurrences, motifOf, occurrenceOf, byTime,
+    spans: mergeSpans(byTime),
+  };
+}
+
+function mergeSpans(byTime) {
+  const spans = [];
+  for (let i = 0; i < byTime.length; i++) {
+    const o = byTime[i];
+    const last = spans.length ? spans[spans.length - 1] : null;
+    if (last && o.startSec <= last.end + 1e-6) {
+      if (o.endSec > last.end) last.end = o.endSec;
+    } else {
+      spans.push({ start: o.startSec, end: o.endSec });
+    }
+  }
+  return spans;
+}
+
+function patternFrom(notes, from, count) {
+  const intervals = [], iois = [];
+  for (let i = 0; i < count - 1; i++) {
+    const a = notes[from + i], b = notes[from + i + 1];
+    intervals.push(b.midi - a.midi);
+    iois.push(Math.max(1e-4, b.startSec - a.startSec));
+  }
+  const unit = iois[0] || 1;
+  return {
+    intervals,
+    ioiRatios: iois.map((x) => x / unit),
+    baseMidi: notes[from].midi,
+    noteCount: count,
+  };
+}
+
+function takeUntil(notes, from, limitSec, cap) {
+  let n = 0;
+  while (from + n < notes.length && n < cap && notes[from + n].startSec < limitSec - 1e-6) n++;
+  return n;
+}
+function indexAtOrAfter(notes, sec) {
+  let i = 0;
+  while (i < notes.length && notes[i].startSec < sec - 1e-6) i++;
+  return i;
+}
+function lowerBoundSec(notes, sec) {
+  let lo = 0, hi = notes.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (notes[mid].startSec < sec - 1e-9) lo = mid + 1; else hi = mid;
+  }
+  return lo;
+}
+
+function collect(out, voiceId, notes, pattern, cfg, inverted, forceType) {
+  const k = pattern.intervals.length;
+  if (k < 3) return;
+  const minK = Math.max(3, Math.ceil(k * cfg.minCompleteness));
+  for (let start = 0; start + minK < notes.length; start++) {
+    const m = matchAt(notes, start, pattern, cfg, inverted, minK);
+    if (!m) continue;
+    const transposition = notes[start].midi - pattern.baseMidi;
+    const type = forceType != null ? forceType : classifyEntry(transposition);
+    const cost = m.cost + (inverted ? 0.4 : 0) + (1 - m.matched / k);
+    out.push({
+      id: `${voiceId}:${start}:${inverted ? "i" : "p"}:${type}`,
+      voiceId, type, transposition, inverted,
+      completeness: m.matched / k,
+      startSec: notes[start].startSec,
+      endSec: notes[start + m.matched].endSec,
+      startIndex: start,
+      endIndex: start + m.matched,
+      cost,
+      confidence: Math.max(0, Math.min(1, (1 - Math.min(1, cost * 0.8)) * (m.matched / k))),
+    });
+  }
+}
+
+function matchAt(notes, start, pattern, cfg, inverted, minK) {
+  const sign = inverted ? -1 : 1;
+  const k = Math.min(pattern.intervals.length, notes.length - start - 1);
+  if (k < minK) return null;
+
+  let deviation = 0, deviantPositions = 0, rhythmViolations = 0, cost = 0, firstIoi = 0, matched = 0;
+  for (let i = 0; i < k; i++) {
+    const a = notes[start + i], b = notes[start + i + 1];
+    const d = Math.abs(b.midi - a.midi - sign * pattern.intervals[i]);
+    if (d > 0) {
+      deviation += d; deviantPositions++;
+      if (deviation > cfg.intervalBudget || deviantPositions > cfg.maxDeviantPositions) break;
+    }
+    const ioi = Math.max(1e-4, b.startSec - a.startSec);
+    if (i === 0) firstIoi = ioi;
+    const rhythmErr = Math.abs(Math.log2(ioi / firstIoi / pattern.ioiRatios[i]));
+    if (rhythmErr > cfg.rhythmTolerance && ++rhythmViolations > cfg.maxRhythmViolations) break;
+    cost += d * 0.5 + Math.min(rhythmErr, 1);
+    matched = i + 1;
+  }
+  if (matched < minK) return null;
+  return { matched, cost: cost / matched };
+}
+
+function classifyEntry(transposition) {
+  const pc = ((transposition % 12) + 12) % 12;
+  if (pc === 0) return MOTIF.SUBJECT;
+  if (pc === 7 || pc === 5) return MOTIF.ANSWER;
+  return MOTIF.SUBJECT;
+}
+
+function selectNonOverlapping(candidates, score) {
+  const ranked = [...candidates].sort((a, b) => a.cost - b.cost || a.startSec - b.startSec);
+  const taken = new Map(score.voices.map((v) => [v.id, []]));
+  const accepted = [];
+  for (const cand of ranked) {
+    const list = taken.get(cand.voiceId);
+    if (!list) continue;
+    if (list.some((o) => cand.startSec < o.endSec - 1e-6 && o.startSec < cand.endSec - 1e-6)) continue;
+    list.push(cand);
+    accepted.push(cand);
+  }
+  return accepted.sort((a, b) => a.startSec - b.startSec || a.voiceId - b.voiceId);
+}
+
+/* ==========================================================================
+ * 6. KRUMHANSL-KESSLER TONALITY
+ * ========================================================================== */
+
+const KK_MAJOR = [6.35, 2.23, 3.48, 2.33, 4.38, 4.09, 2.52, 5.19, 2.39, 3.66, 2.29, 2.88];
+const KK_MINOR = [6.33, 2.68, 3.52, 5.38, 2.60, 3.53, 2.54, 4.75, 3.98, 2.69, 3.34, 3.17];
+const PC_NAMES = ["C", "C\u266F", "D", "E\u266D", "E", "F", "F\u266F", "G", "A\u266D", "A", "B\u266D", "B"];
+
+function estimateKey(score) {
+  const weights = new Array(12).fill(0);
+  let total = 0;
+  for (const voice of score.voices) {
+    for (const n of voice.notes) {
+      const d = n.endSec - n.startSec;
+      weights[((n.midi % 12) + 12) % 12] += d;
+      total += d;
+    }
+  }
+  if (total <= 0) return null;
+
+  let best = null, second = -Infinity;
+  for (let tonic = 0; tonic < 12; tonic++) {
+    for (const mode of ["major", "minor"]) {
+      const profile = mode === "major" ? KK_MAJOR : KK_MINOR;
+      const rotated = profile.map((_, i) => profile[(i - tonic + 120) % 12]);
+      const r = pearson(weights, rotated);
+      if (!best || r > best.confidence) {
+        if (best) second = best.confidence;
+        best = { tonic, mode, confidence: r, margin: 0, label: `${PC_NAMES[tonic]} ${mode}` };
+      } else if (r > second) second = r;
+    }
+  }
+  return best ? Object.assign({}, best, { margin: best.confidence - second }) : null;
+}
+
+function pearson(a, b) {
+  const ma = a.reduce((s, x) => s + x, 0) / a.length;
+  const mb = b.reduce((s, x) => s + x, 0) / b.length;
+  let num = 0, da = 0, db = 0;
+  for (let i = 0; i < a.length; i++) {
+    const x = a[i] - ma, y = b[i] - mb;
+    num += x * y; da += x * x; db += y * y;
+  }
+  const den = Math.sqrt(da * db);
+  return den === 0 ? 0 : num / den;
+}
+
+/* ==========================================================================
+ * 7. GLYPH GEOMETRY (Graceful Cantilena Contour Fallback)
+ * ========================================================================== */
+
+const MATRIX_COLUMNS = 56;
+
+function buildGlyph(score, analysis) {
+  return contourGlyph(score, analysis) || matrixGlyph(score);
+}
+
+function contourGlyph(score, analysis) {
+  let notes = null;
+  let voiceId = 0;
+  let caption = "Melodic Contour";
+
+  // Scenario A: Staggered fugal entry detected
+  if (analysis && analysis.subject && analysis.byTime.length > 0) {
+    const dux = analysis.byTime[0];
+    const voice = score.voices.find((v) => v.id === dux.voiceId);
+    if (voice) {
+      notes = voice.notes.filter((n) => n.startSec >= dux.startSec - 1e-9 && n.startSec <= dux.endSec + 1e-9);
+      voiceId = voice.id;
+      caption = `Subject — ${voice.label}`;
+    }
+  }
+
+  // Scenario B: Homophonic opening (e.g. Goldberg Aria) — take the singing soprano theme
+  if (!notes || notes.length < 3) {
+    const topVoice = score.voices[0];
+    if (topVoice && topVoice.notes.length >= 3) {
+      const maxSec = score.measures && score.measures.length >= 4 ? score.measures[3].startSec : topVoice.notes[0].startSec + 8;
+      notes = topVoice.notes.filter((n) => n.startSec <= maxSec).slice(0, 16);
+      if (notes.length < 3) notes = topVoice.notes.slice(0, Math.min(16, topVoice.notes.length));
+      voiceId = topVoice.id;
+      caption = `Theme — ${topVoice.label}`;
+    }
+  }
+
+  if (!notes || notes.length < 3) return null;
+
+  const t0 = notes[0].startSec;
+  const span = Math.max(1e-6, notes[notes.length - 1].endSec - t0);
+  const lo = Math.min(...notes.map((n) => n.midi));
+  const hi = Math.max(...notes.map((n) => n.midi));
+  const range = Math.max(1, hi - lo);
+  const medianDur = median(notes.map((n) => n.endSec - n.startSec));
+
+  return {
+    kind: "contour",
+    points: notes.map((n, i) => ({
+      u: (n.startSec - t0) / span,
+      v: (n.midi - lo) / range,
+      midi: n.midi, sec: n.startSec,
+      pivot: classifyPivot(notes, i, medianDur),
+    })),
+    cells: [], rows: score.voices.length, voiceId,
+    caption,
+  };
+}
+
+function classifyPivot(notes, i, medianDur) {
+  const prev = notes[i - 1], next = notes[i + 1], cur = notes[i];
+  if (prev && Math.abs(cur.midi - prev.midi) >= 3) return "leap";
+  if (next && Math.abs(next.midi - cur.midi) >= 3) return "leap";
+  if (cur.endSec - cur.startSec >= medianDur * 1.75) return "suspension";
+  if (prev && next) {
+    const a = Math.sign(cur.midi - prev.midi), b = Math.sign(next.midi - cur.midi);
+    if (a !== 0 && b !== 0 && a !== b) return "turn";
+  }
+  return "none";
+}
+
+function matrixGlyph(score) {
+  const cells = [];
+  const dur = Math.max(1e-6, score.durSec);
+  const colSec = dur / MATRIX_COLUMNS;
+  score.voices.forEach((voice, row) => {
+    const counts = new Array(MATRIX_COLUMNS).fill(0);
+    for (const n of voice.notes) counts[Math.min(MATRIX_COLUMNS - 1, Math.floor(n.startSec / colSec))]++;
+    const peak = Math.max(1, ...counts);
+    counts.forEach((count, c) => {
+      if (count > 0) cells.push({ u: c / MATRIX_COLUMNS, row, density: count / peak });
+    });
+  });
+  return {
+    kind: "matrix", points: [], cells,
+    rows: Math.max(1, score.voices.length), voiceId: null,
+    caption: "Voice topography",
+  };
+}
+
+function median(xs) {
+  if (!xs.length) return 1;
+  const s = [...xs].sort((a, b) => a - b), mid = s.length >> 1;
+  return s.length % 2 ? s[mid] : (s[mid - 1] + s[mid]) / 2;
+}
+
+/* ==========================================================================
+ * 8. MONOGRAM CONTENT (Intelligent BWV & Cantabile Detection)
+ * ========================================================================== */
+
+function extractCatalogue(name) {
+  const s = String(name || "");
+  const mBwv = /\bBWV[\s_-]*(\d+[a-z]?)\b/i.exec(s);
+  if (mBwv) return `BWV ${mBwv[1]}`;
+  const mNum = /\b(988|84[6-9]|8[5-9]\d|10\d{2}|[1-9]\d{2})\b/i.exec(s);
+  if (mNum) return `BWV ${mNum[1]}`;
+  return null;
+}
+
+function cleanTitle(name) {
+  return (name || "")
+    .replace(/\.(mid|midi)$/i, "")
+    .replace(/[_-]+/g, " ")
+    .replace(/\s*\bBWV\s*\d+[a-z]?\b\s*/i, " ")
+    .replace(/\b988\b/i, "")
+    .replace(/\s{2,}/g, " ")
+    .trim() || "Untitled";
+}
+
+function buildMonogram(score, analysis, hints) {
+  hints = hints || {};
+  const key = estimateKey(score);
+  const voices = score.voices.length;
+  const count = `${voices} ${voices === 1 ? "Voice" : "Voices"}`;
+  
+  let architecture = `${count} / Cantabile`;
+  if (analysis && analysis.subject) {
+    const answers = analysis.occurrences.filter((o) => o.type === MOTIF.ANSWER).length;
+    architecture = `${count} / ${answers > 0 ? "Strict Counterpoint" : "Imitative Counterpoint"}`;
+  } else if (score.measures && score.measures.length > 0) {
+    architecture = `${count} / Polyphonic Setting`;
+  }
+
+  return {
+    title: hints.title || cleanTitle(score.name),
+    catalogue: hints.catalogue || extractCatalogue(score.name) || "\u2014",
+    architecture,
+    tonality: key ? key.label + (key.margin < 0.05 ? " (ambiguous)" : "") : "\u2014",
+    measures: score.measures.length > 0 ? `${score.measures.length} bars` : "\u2014",
+    glyph: buildGlyph(score, analysis),
+  };
+}
+
+/* ==========================================================================
+ * 9. VIEW — Calibrated Spatial Dimensions & Commanding Pitch Lanes
+ * ========================================================================== */
+
+const PHI = 1.6180339887498948;
+const PLATE = { width: 1200, height: 675, minWidth: 1200 };
+
+function plateFit(viewportW, viewportH) {
+  const scale = Math.min(viewportW / PLATE.width, viewportH / PLATE.height);
+  return {
+    scale,
+    offsetX: (viewportW - PLATE.width * scale) / 2,
+    offsetY: (viewportH - PLATE.height * scale) / 2,
+  };
+}
+
+/**
+ * The Shorts (9:16) fit: COVER rather than CONTAIN, centered on the
+ * playhead rather than the plate's own midpoint.
+ *
+ * Cover, because a 9:16 box is far narrower than the 16:9 plate -- fitting
+ * by containment would show the whole plate shrunk into a small strip with
+ * huge empty bars, not an "intimate vertical framing." Covering scales the
+ * plate up until its height fills the box, deliberately letting most of its
+ * width run outside the frame.
+ *
+ * Centered on the playhead rather than the midpoint, because once the plate
+ * is wider than the visible box, "centered" has to mean something -- and
+ * centering on the piece's timeline midpoint would show a fixed slice near
+ * the middle of the piece, drifting further from what is actually sounding
+ * the longer playback runs. The playhead already tracks exactly where the
+ * active voice-leading is; reusing its own position as the crop's anchor
+ * needs no separate "smart tracking" logic of its own.
+ */
+function plateFitCover(viewportW, viewportH, playheadX) {
+  const scale = Math.max(viewportW / PLATE.width, viewportH / PLATE.height);
+  return {
+    scale,
+    offsetY: (viewportH - PLATE.height * scale) / 2,
+    offsetX: viewportW / 2 - playheadX * scale,
+  };
+}
+
+/** The playhead's x position in PLATE-space -- fixed, independent of score,
+ * dpr, or on-screen scale, since it is derived purely from the plate's own
+ * constant margins and the golden playheadRatio. Kept as one small shared
+ * function so the cover-fit calculation (which needs it before layoutView
+ * can run) and layoutView itself can never drift apart. */
+function platePlayheadX(playheadRatio) {
+  const marginX = Math.round(PLATE.width * 0.06);
+  const innerW = PLATE.width - marginX * 2;
+  return marginX + Math.round(innerW * (playheadRatio == null ? 0.381966 : playheadRatio));
+}
+
+function layoutView(score, dpr, pxPerSec, playheadRatio, pullBack) {
+  const span = Math.max(10, score.pitchHi - score.pitchLo);
+  const width = PLATE.width, height = PLATE.height;
+  // Immersive framing: margins cut a further ~20% from the already-trimmed
+  // values, so the musical lines fill the frame with real presence rather
+  // than floating in a wide, quiet border -- an intimate illuminated page,
+  // not a plate mounted behind glass. The bottom-heavier-than-top ratio
+  // (1.15x) is kept unchanged, so the optical-mount proportion survives the
+  // tighter crop.
+  //
+  // Cadence pull-back: `pullBack` (0..1) widens every margin by up to 15%
+  // during the piece's final measure and reverb tail -- a slow, stately
+  // opening-up that reveals more of the surrounding vellum right as the
+  // music itself settles, rather than staying pressed to the frame's edge
+  // all the way through the final chord. 0 in every ordinary frame, so this
+  // costs nothing outside the last few seconds of a piece.
+  const pullFactor = 1 + Math.max(0, Math.min(1, pullBack || 0)) * 0.15;
+  const marginX = Math.round(width * 0.06 * pullFactor);
+  const marginTop = Math.round(height * 0.068 * pullFactor);
+  // Margin refinement: 1.35x keeps the bottom-heavier-than-top optical-mount
+  // asymmetry, pushed to a magnitude that actually reads at video scale
+  // rather than one so gentle it was nearly imperceptible.
+  const marginBottom = Math.round(marginTop * 1.35);
+  const innerW = Math.max(40, width - marginX * 2);
+  const innerH = Math.max(24, height - marginTop - marginBottom);
+  return {
+    width, height, dpr, pxPerSec,
+    left: marginX, right: marginX + innerW,
+    top: marginTop, bottom: marginTop + innerH,
+    innerW, innerH,
+    rowH: innerH / span,
+    // The golden division (1 - 1/phi): a mathematically exact split between
+    // "history" and "what's coming," not an approximation of one.
+    playheadX: marginX + Math.round(innerW * (playheadRatio == null ? 0.381966 : playheadRatio)),
+    pitchTop: score.pitchHi,
+    pitchBottom: score.pitchHi - span,
+  };
+}
+const xOfSec = (v, sec, t) => (sec - t) * v.pxPerSec + v.playheadX;
+const secOfX = (v, x, t) => (x - v.playheadX) / v.pxPerSec + t;
+const yOfMidi = (v, midi) => v.top + (v.pitchTop - midi) * v.rowH;
+
+function visibleWindow(v, t, into) {
+  into.start = (v.left - 60 - v.playheadX) / v.pxPerSec + t;
+  into.end = (v.right + 60 - v.playheadX) / v.pxPerSec + t;
+  return into;
+}
+
+/* ==========================================================================
+ * 10. RENDERING LAYERS & URTEXT MEASURE NUMBERING
+ * ========================================================================== */
+
+let THEME = environmentFor(activeTheme);
+
+function drawPaper(ctx, score, v, paper, showRules, canvas) {
+  if (canvas) {
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.restore();
+  } else {
+    ctx.clearRect(0, 0, v.width, v.height);
+  }
+  if (paper) ctx.drawImage(paper, 0, 0, v.width, v.height);
+  else { ctx.fillStyle = THEME.paper; ctx.fillRect(0, 0, v.width, v.height); }
+  if (!showRules) return;
+
+  const dpr = v.dpr || 1;
+  const half = 0.5 / dpr;
+
+  ctx.strokeStyle = THEME.ruleOctave;
+  ctx.lineWidth = 0.5 / dpr;
+  ctx.beginPath();
+  for (let m = v.pitchBottom; m <= v.pitchTop; m++) {
+    if (m % 12 !== 0) continue;
+    const y = snap(yOfMidi(v, m), dpr) + half;
+    ctx.moveTo(v.left, y);
+    ctx.lineTo(v.right, y);
+  }
+  ctx.stroke();
+
+  ctx.fillStyle = THEME.label;
+  ctx.font = THEME.labelFont;
+  ctx.textBaseline = "middle";
+  for (let m = v.pitchBottom; m <= v.pitchTop; m++) {
+    if (m % 12 !== 0) continue;
+    ctx.fillText(`C${Math.floor(m / 12) - 1}`, v.left - 28, snap(yOfMidi(v, m), dpr));
+  }
+}
+
+function drawRules(ctx, score, v, t, windowStart, windowEnd) {
+  const measures = score.measures;
+  if (measures.length === 0) return;
+  const dpr = v.dpr || 1;
+  const half = 0.5 / dpr;
+
+  // Major phrase boundary rules (every 4 bars) with Urtext measure numbering
+  ctx.lineWidth = 0.5 / dpr;
+  ctx.strokeStyle = THEME.ruleBarMajor;
+  ctx.beginPath();
+  for (let i = 0; i < measures.length; i++) {
+    const m = measures[i];
+    if (m.startSec < windowStart) continue;
+    if (m.startSec > windowEnd) break;
+    if (m.index % 4 === 0) {
+      const x = snap(xOfSec(v, m.startSec, t), dpr) + half;
+      ctx.moveTo(x, v.top);
+      ctx.lineTo(x, v.bottom);
+    }
+  }
+  ctx.stroke();
+
+  // Fine Urtext Measure Numbers above the top ruling boundary
+  ctx.font = THEME.barNumberFont;
+  ctx.fillStyle = THEME.ruleNumber;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "bottom";
+  for (let i = 0; i < measures.length; i++) {
+    const m = measures[i];
+    if (m.startSec < windowStart) continue;
+    if (m.startSec > windowEnd) break;
+    if (m.index % 4 === 0 && m.index > 0) {
+      const x = snap(xOfSec(v, m.startSec, t), dpr);
+      ctx.fillText(String(m.index + 1), x, v.top - 3);
+    }
+  }
+
+  // Subtle minor barline ticks at margin boundaries
+  ctx.strokeStyle = THEME.ruleBarTick;
+  ctx.beginPath();
+  for (let i = 0; i < measures.length; i++) {
+    const m = measures[i];
+    if (m.startSec < windowStart) continue;
+    if (m.startSec > windowEnd) break;
+    if (m.index % 4 !== 0) {
+      const x = snap(xOfSec(v, m.startSec, t), dpr) + half;
+      ctx.moveTo(x, v.top);
+      ctx.lineTo(x, v.top + 6);
+      ctx.moveTo(x, v.bottom - 6);
+      ctx.lineTo(x, v.bottom);
+    }
+  }
+  ctx.stroke();
+}
+
+const STROKE = {
+  // Substantial (not thin) but bounded, and -- the actual fix -- paired with
+  // a real laneGap. At the old 15.5/0.8 pairing, any voice pair closer than a
+  // major second in a moderately wide-range piece was rendering with under a
+  // pixel of daylight between blocks, which is the one thing a contrapuntal
+  // plate cannot afford: two voices merging into one shape erases the
+  // harmonic interval between them. laneGap is now large enough to always
+  // read as a gap; weight is pulled back only enough to make room for it, and
+  // the plate's own vertical margins (see layoutView) were trimmed slightly
+  // so lane height grows too, rather than note weight being the only line
+  // item that pays for the extra separation.
+  weight: 11,
+  minWeight: 6.5,
+  laneGap: 2.3,
+  radius: 1.7,
+  grain: 0.35,
+  minLength: 4.5,
+};
+
+/**
+ * A stamped rectangular bar, not a calligraphic stroke.
+ *
+ * A prior pass tapered both ends toward a point -- "a broad-nib pen's
+ * pressure curve" -- and at any real note length that taper reads exactly as
+ * what it geometrically is: a canoe, a leaf, an arrowhead. A woodblock print
+ * does not do that. A carved rectangular slug is inked and stamped; its ends
+ * are a flat vertical cut where the block itself simply stops, not a
+ * hand-lifted point. So: x0 and x1 are true flat vertical edges, full body
+ * width all the way to the corner, with only a small radius (STROKE.radius)
+ * softening the four corners themselves -- worn tool marks, not narrowing.
+ *
+ * The organic imperfection survives, but it is relocated to where a real
+ * carved block actually shows its hand: a faint wobble ALONG the top and
+ * bottom edges (the grain term below), never a narrowing of the ends. The
+ * macro silhouette is a rectangle at every note length, short or long.
+ */
+function woodblockPath(ctx, x0, x1, yc, half, r, seed) {
+  const len = x1 - x0;
+  const rr = Math.min(r, half * 0.7, len * 0.32);
+  const steps = len < 20 ? 3 : len < 60 ? 5 : len < 150 ? 8 : 11;
+  const freq = 1.4 + seed * 2.2;
+  const phase = seed * 6.28318;
+
+  // Grain only -- no taper term of any kind. Half-width wobbles by a few
+  // tenths of a pixel along the length; it never narrows toward either end.
+  const halfAt = (u) => {
+    const grain = STROKE.grain * 0.7 * Math.sin(u * freq * 6.28318 + phase);
+    return Math.max(0.8, half + grain);
+  };
+
+  const top = (u) => yc - halfAt(u);
+  const bot = (u) => yc + halfAt(u);
+  const xAt = (u) => x0 + len * u;
+
+  ctx.moveTo(x0 + rr, top(0));
+  for (let i = 1; i <= steps; i++) ctx.lineTo(xAt(i / steps) - (i === steps ? rr : 0), top(i / steps));
+  ctx.quadraticCurveTo(x1, top(1), x1, top(1) + rr);
+  ctx.lineTo(x1, bot(1) - rr);
+  ctx.quadraticCurveTo(x1, bot(1), x1 - rr, bot(1));
+  for (let i = steps - 1; i >= 0; i--) ctx.lineTo(xAt(i / steps) + (i === 0 ? rr : 0), bot(i / steps));
+  ctx.quadraticCurveTo(x0, bot(0), x0, bot(0) - rr);
+  ctx.lineTo(x0, top(0) + rr);
+  ctx.quadraticCurveTo(x0, top(0), x0 + rr, top(0));
+  ctx.closePath();
+}
+
+function snap(value, dpr) {
+  return Math.round(value * dpr) / dpr;
+}
+
+/**
+ * The top and bottom edges of a note traced as OPEN paths, sharing the exact
+ * same grain wobble `woodblockPath` uses for its fill -- so the letterpress
+ * bite below reads as the note's own edge catching light/shadow, not a
+ * generic rectangle outline pasted on top.
+ */
+function woodblockEdge(ctx, x0, x1, yc, half, seed, top) {
+  const len = x1 - x0;
+  const steps = len < 20 ? 3 : len < 60 ? 5 : len < 150 ? 8 : 11;
+  const freq = 1.4 + seed * 2.2;
+  const phase = seed * 6.28318;
+  const sign = top ? -1 : 1;
+  for (let i = 0; i <= steps; i++) {
+    const u = i / steps;
+    const grain = STROKE.grain * 0.7 * Math.sin(u * freq * 6.28318 + phase);
+    const x = x0 + len * u, y = yc + sign * Math.max(0.8, half + grain);
+    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  }
+}
+
+/**
+ * Letterpress ink-bite: a microscopic inset shadow along a note's top edge
+ * and a soft highlight along its bottom -- the impression of a stamp
+ * physically pressed into the sheet, not a second geometric layer or a new
+ * plane. Two cheap batched stroke passes over the SAME notes just filled,
+ * at 4-6% opacity: present enough to read as tactile depth, never enough to
+ * compete with the ink itself or imply the note is anything but flat ink on
+ * flat paper.
+ */
+function drawInkBite(ctx, notes, ds) {
+  if (notes.length === 0) return;
+  ctx.lineWidth = Math.max(0.6, 1 / ds);
+  ctx.beginPath();
+  for (let j = 0; j < notes.length; j++) {
+    const n = notes[j];
+    woodblockEdge(ctx, n.x0, n.x1, n.y, n.half, noteSeed(n.id), true);
+  }
+  ctx.strokeStyle = "rgba(20, 14, 8, 0.055)";
+  ctx.stroke();
+  ctx.beginPath();
+  for (let j = 0; j < notes.length; j++) {
+    const n = notes[j];
+    woodblockEdge(ctx, n.x0, n.x1, n.y, n.half, noteSeed(n.id), false);
+  }
+  ctx.strokeStyle = "rgba(255, 250, 235, 0.05)";
+  ctx.stroke();
+}
+
+function drawVoiceNotes(ctx, voice, v, t, from, windowStart, windowEnd, state, sc, out, tensionBuf) {
+  const ds = v.dpr || 1;
+  const weight = voice.weight || { width: 1 };
+  out.drawn = 0; out.sounding = 0; out.thematic = 0;
+
+  const lane = Math.max(STROKE.minWeight, v.rowH - STROKE.laneGap);
+  const wanted = Math.min(STROKE.weight * weight.width, lane);
+  const hDev = Math.max(5, Math.round(wanted * ds));
+  const height = hDev / ds;
+  const half = height * 0.5;
+  const oddOffset = hDev % 2 ? 0.5 / ds : 0;
+
+  const restingNotes = [];
+  const activeNotes = [];
+
+  for (let i = from; i < voice.notes.length; i++) {
+    const n = voice.notes[i];
+    if (n.startSec > windowEnd) break;
+    if (n.endSec < windowStart) continue;
+
+    const x0 = snap(xOfSec(v, n.startSec, t), ds);
+    const x1 = Math.max(x0 + STROKE.minLength, snap(xOfSec(v, n.endSec, t), ds));
+    if (x1 < v.left - 50 || x0 > v.right + 50) continue;
+
+    const y = snap(yOfMidi(v, n.midi), ds) + oddOffset;
+    const dur = Math.max(0.06, n.endSec - n.startSec);
+
+    let breathe = 0;
+    const isSounding = t >= n.startSec && t < n.endSec;
+    const isPostRelease = !isSounding && t >= n.endSec && t < n.endSec + 0.08;
+
+    if (isSounding) {
+      out.sounding++;
+      const elapsed = t - n.startSec;
+      const vel = Math.max(0.4, Math.min(1.0, n.vel || 0.75));
+
+      const peakSwell = 0.75 + vel * 0.85;
+      const attackTime = Math.min(0.035, dur * 0.25);
+      let env = 0;
+
+      if (elapsed < attackTime) {
+        env = peakSwell * (elapsed / attackTime);
+      } else {
+        const settleProgress = Math.min(1, (elapsed - attackTime) / 0.07);
+        const sustainLevel = 0.32 * vel;
+        env = sustainLevel + (peakSwell - sustainLevel) * Math.exp(-settleProgress * 3.5);
+      }
+
+      breathe = env;
+      activeNotes.push({ x0, x1, y, half: half + (breathe * 0.5), id: n.id, dur, breathe, midi: n.midi, elapsed });
+      if (tensionBuf) tensionBuf.push({ x0, x1, y, half: half + (breathe * 0.5), midi: n.midi, voiceId: voice.id });
+    } else if (isPostRelease) {
+      const relElapsed = t - n.endSec;
+      const relFade = Math.max(0, 1 - (relElapsed / 0.08));
+      breathe = 0.35 * Math.pow(relFade, 2);
+      activeNotes.push({ x0, x1, y, half: half + (breathe * 0.5), id: n.id, dur, breathe, midi: n.midi, elapsed: dur });
+    } else {
+      restingNotes.push({ x0, x1, y, half, id: n.id, dur });
+    }
+
+    out.drawn++;
+    if (state.highlight && state.motifOf[n.id] !== MOTIF.EPISODE) out.thematic++;
+  }
+
+  if (restingNotes.length > 0) {
+    ctx.beginPath();
+    for (let j = 0; j < restingNotes.length; j++) {
+      const rn = restingNotes[j];
+      woodblockPath(ctx, rn.x0, rn.x1, rn.y, rn.half, STROKE.radius, noteSeed(rn.id));
+    }
+    ctx.fillStyle = state.audible ? voice.palette.resting : voice.palette.silent;
+    ctx.fill();
+    if (state.audible) drawInkBite(ctx, restingNotes, ds);
+  }
+
+  if (activeNotes.length > 0) {
+    ctx.beginPath();
+    for (let k = 0; k < activeNotes.length; k++) {
+      const an = activeNotes[k];
+      woodblockPath(ctx, an.x0, an.x1, an.y, an.half, STROKE.radius, noteSeed(an.id));
+    }
+    ctx.fillStyle = voice.palette.base;
+    ctx.fill();
+    drawInkBite(ctx, activeNotes, ds);
+
+    // Pedal-point ink pooling: on notes long enough to actually sustain
+    // (dur > 2.2s -- ordinary Bach sixteenths and eighths never qualify),
+    // the pigment deepens by a few percent toward the tail, as if the ink
+    // were settling further into the fibres the longer it sits. A single
+    // extra fill per qualifying note, individually coloured -- and in real
+    // Bach counterpoint there are rarely more than one or two such notes
+    // sounding at once, so this never threatens the batched-fill budget the
+    // rest of the pass depends on.
+    const rgb = voice.palette.rgb;
+    for (let k = 0; k < activeNotes.length; k++) {
+      const an = activeNotes[k];
+      if (an.dur <= 2.2 || !rgb) continue;
+      const settle = Math.max(0, Math.min(1, (an.elapsed - 0.3) / Math.max(0.4, an.dur - 0.3)));
+      if (settle <= 0.02) continue;
+      const pool = settle * 0.035;
+      ctx.beginPath();
+      woodblockPath(ctx, an.x0, an.x1, an.y, an.half, STROKE.radius, noteSeed(an.id));
+      ctx.fillStyle = `rgb(${Math.round(rgb[0] * (1 - pool))}, ${Math.round(rgb[1] * (1 - pool))}, ${Math.round(rgb[2] * (1 - pool))})`;
+      ctx.fill();
+    }
+  }
+}
+
+/**
+ * Capillary tension: when two voices in DIFFERENT parts are sounding a
+ * major or minor second apart, the closest edges of their two strokes get a
+ * microscopic ink pull toward each other -- close enough that wet ink on
+ * damp paper genuinely does this. Strength falls off smoothly as the
+ * interval widens past a second and disappears entirely beyond it; nothing
+ * here compares notes that are not actually sounding at the same instant.
+ *
+ * O(n^2) over currently-SOUNDING notes only -- in real Bach counterpoint
+ * that is a handful at any instant, so the quadratic cost here is trivial
+ * regardless of how large the score is.
+ */
+function drawCapillaryTension(ctx, candidates, dpr) {
+  if (candidates.length < 2) return;
+  const px = 1 / (dpr || 1);
+  ctx.beginPath();
+  let any = false;
+  for (let i = 0; i < candidates.length; i++) {
+    const a = candidates[i];
+    for (let j = i + 1; j < candidates.length; j++) {
+      const b = candidates[j];
+      if (a.voiceId === b.voiceId) continue;
+      const interval = Math.abs(a.midi - b.midi);
+      if (interval < 0.5 || interval > 2.999) continue;
+      if (a.x1 < b.x0 || b.x1 < a.x0) continue; // no time overlap right now
+      const strength = Math.max(0, 1 - (interval - 1) / 2);
+      if (strength < 0.04) continue;
+      const ox = Math.max(a.x0, b.x0), ex = Math.min(a.x1, b.x1);
+      const midX = (ox + ex) * 0.5;
+      const ay = a.y + (a.midi < b.midi ? a.half : -a.half);
+      const by = b.y + (b.midi < a.midi ? b.half : -b.half);
+      ctx.moveTo(midX, ay);
+      ctx.quadraticCurveTo(midX, (ay + by) * 0.5, midX, by);
+      any = true;
+    }
+  }
+  if (!any) return;
+  ctx.strokeStyle = "rgba(20, 14, 8, 0.06)";
+  ctx.lineWidth = px;
+  ctx.stroke();
+}
+
+function noteSeed(id) {
+  let x = (id * 2654435761) >>> 0;
+  x ^= x >>> 15; x = (x * 2246822519) >>> 0;
+  x ^= x >>> 13; x = (x * 3266489917) >>> 0;
+  return ((x ^ (x >>> 16)) >>> 0) / 4294967296;
+}
+
+/* ==========================================================================
+ * 10c. VOICE LEGEND
+ *
+ * The one piece of on-plate typography kept from the old technical HUD --
+ * not a diagnostic readout, just which colour belongs to which voice, set
+ * quietly in the same italic hand as the rest of the illuminated page.
+ * ========================================================================== */
+
+/**
+ * The playhead: a minimalist hairline rule across the pitch field, nothing
+ * more -- no glow, no fill, no beam. Snapped to the device pixel grid so it
+ * stays a true single-pixel line at any DPR rather than a soft two-pixel
+ * smear, exactly like every other crisp edge in this piece.
+ */
+function drawPlayhead(ctx, view) {
+  if (!view) return;
+  const dpr = view.dpr || 1;
+  const x = snap(view.playheadX, dpr) + 0.5 / dpr;
+  ctx.beginPath();
+  ctx.moveTo(x, view.top);
+  ctx.lineTo(x, view.bottom);
+  ctx.strokeStyle = inkOf();
+  ctx.globalAlpha = 0.55;
+  ctx.lineWidth = 1 / dpr;
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+}
+
+function drawPlateLegend(ctx, score, v) {
+  if (!score || !v) return;
+  ctx.save();
+  ctx.font = 'italic 12px "EB Garamond", Georgia, serif';
+  ctx.textBaseline = "middle";
+
+  const totalVoices = score.voices.length;
+  const items = [];
+  let totalWidth = 0;
+  for (let i = 0; i < totalVoices; i++) {
+    const voice = score.voices[i];
+    const nameWidth = ctx.measureText(voice.label).width;
+    items.push({ voice, width: 14 + nameWidth });
+    totalWidth += 14 + nameWidth + (i < totalVoices - 1 ? 22 : 0);
+  }
+
+  const startX = Math.round((PLATE.width - totalWidth) / 2);
+  const y = v.top - 20;
+
+  let curX = startX;
+  for (let i = 0; i < items.length; i++) {
+    const { voice, width } = items[i];
+    ctx.fillStyle = voice.palette.base;
+    ctx.beginPath();
+    ctx.arc(curX + 4, y, 4.5, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = THEME.inkSoft;
+    ctx.textAlign = "left";
+    ctx.fillText(voice.label, curX + 13, y);
+
+    curX += width + 22;
+  }
+  ctx.restore();
+}
+
+/* ==========================================================================
+ * 11. PROLOGUE (Dynamic Auto-Measuring Table Layout)
+ * ========================================================================== */
+
+const PROLOGUE_SEC = 3.5;
+const UNFOLD_START = 2.6;
+const DISPLAY_STACK = '"EB Garamond","Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif';
+const MONO_STACK = '"Geist Mono",ui-monospace,"SF Mono","JetBrains Mono",Menlo,monospace';
+
+const inkOf = () => THEME.ink;
+const inkSoftOf = () => THEME.inkSoft;
+const ruleOf = () => THEME.ruleOctave;
+const glowOf = () => THEME.glow;
+
+const unfoldFraction = (t) => (t <= UNFOLD_START ? 0 : Math.min(1, (t - UNFOLD_START) / (PROLOGUE_SEC - UNFOLD_START)));
+const ease = (u) => (u < 0.5 ? 4 * u * u * u : 1 - Math.pow(-2 * u + 2, 3) / 2);
+
+class Prologue {
+  constructor() { this.startedAt = 0; this.monogram = null; this.active = false; }
+  begin(monogram, now) { this.monogram = monogram; this.startedAt = now; this.active = true; }
+  cancel() { this.active = false; }
+  elapsed(now) { return (now - this.startedAt) / 1000; }
+  draw(ctx, score, view, now) {
+    if (!this.monogram) return { scoreAlpha: 1, done: true };
+    const t = Math.min(PROLOGUE_SEC, this.elapsed(now));
+    const frame = drawMonogram(ctx, this.monogram, score, view,
+      view ? view.width : 0, view ? view.height : 0, unfoldFraction(t), t);
+    if (t >= PROLOGUE_SEC) { this.active = false; return { scoreAlpha: 1, done: true }; }
+    return frame;
+  }
+}
+
+const STAMP_SETTLE = 0.45;
+
+/**
+ * The title card's entry: a stamp, not a fade or a slide.
+ *
+ * A physical stamp strikes instantly -- full position, full ink, in one
+ * frame, not eased in from nothing or slid from off-plate. What DOES take a
+ * moment is the impression settling into the fibres: a soft plate-mark
+ * rectangle -- the literal indented border a real printing plate leaves in
+ * paper -- fades up around the title block over STAMP_SETTLE seconds,
+ * using the exact same dark-top-left/light-bottom-right bevel convention as
+ * every note's own ink-bite. That reuse is deliberate: the card should
+ * speak the same physical language as the music it introduces, not a
+ * separate "UI" language of its own.
+ *
+ * `stampT` is seconds elapsed since the prologue itself began. A still
+ * export (the video thumbnail) has no elapsed time to speak of and should
+ * show the page already settled, so it passes null/omits the argument.
+ */
+function drawPlateMark(ctx, x, y, w, h, alpha, dpr) {
+  if (alpha <= 0.003) return;
+  const inset = 1.4 / (dpr || 1);
+  ctx.beginPath();
+  ctx.moveTo(x, y + h);
+  ctx.lineTo(x, y);
+  ctx.lineTo(x + w, y);
+  ctx.strokeStyle = `rgba(15, 10, 5, ${0.09 * alpha})`;
+  ctx.lineWidth = inset;
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(x + inset * 2, y + h + inset * 2);
+  ctx.lineTo(x + w + inset * 2, y + h + inset * 2);
+  ctx.lineTo(x + w + inset * 2, y + inset * 2);
+  ctx.strokeStyle = `rgba(255, 250, 235, ${0.08 * alpha})`;
+  ctx.lineWidth = inset;
+  ctx.stroke();
+}
+
+function drawMonogram(ctx, m, score, view, w, h, u, stampT) {
+  if (w <= 0 || h <= 0) return { scoreAlpha: 1, done: true };
+  const e = ease(u);
+  const cardAlpha = 1 - e;
+  const settle = stampT == null ? 1 : Math.min(1, Math.max(0, stampT / STAMP_SETTLE));
+
+  ctx.save();
+  ctx.fillStyle = THEME.paper;
+  ctx.globalAlpha = Math.min(1, 1 - e * 0.98);
+  ctx.fillRect(0, 0, w, h);
+  ctx.globalAlpha = 1;
+
+  const margin = h * 0.085;
+  const serif = (size) => `${size}px ${DISPLAY_STACK}`;
+  const mono = (size) => `${size}px ${MONO_STACK}`;
+
+  if (cardAlpha > 0.004) {
+    ctx.globalAlpha = cardAlpha;
+    ctx.textBaseline = "alphabetic";
+    ctx.textAlign = "left";
+
+    const titleSize = h * 0.082;
+    ctx.fillStyle = inkOf(); ctx.font = serif(titleSize);
+    const titleY = margin + titleSize;
+    if (m._wrapW !== w) { m._wrapW = w; m._lines = wrapText(ctx, m.title, w * 0.46); }
+    const lines = m._lines;
+    lines.forEach((line, i) => ctx.fillText(line, margin, titleY + i * titleSize * 1.12));
+
+    const ruleY = titleY + lines.length * titleSize * 1.12 + h * 0.03;
+    ctx.strokeStyle = ruleOf(); ctx.lineWidth = Math.max(1, h * 0.0012);
+    ctx.beginPath(); ctx.moveTo(margin, ruleY); ctx.lineTo(margin + w * 0.42, ruleY); ctx.stroke();
+
+    const metaSize = h * 0.0215;
+    ctx.font = mono(metaSize);
+
+    // Clean historical attribution: eliminate ugly "CATALOGUE —"
+    const hasCatalogue = m.catalogue && m.catalogue !== "\u2014" && m.catalogue !== "-";
+    const rows = [
+      [hasCatalogue ? "CATALOGUE" : "WORK", hasCatalogue ? m.catalogue : m.title],
+      ["ARCHITECTURE", m.architecture],
+      ["TONALITY", m.tonality],
+      ["MEASURES", m.measures],
+    ];
+
+    // Dynamic auto-measurement: mathematically guarantees labels and values NEVER collide
+    let maxLabelWidth = 0;
+    for (let r = 0; r < rows.length; r++) {
+      const lw = ctx.measureText(rows[r][0]).width;
+      if (lw > maxLabelWidth) maxLabelWidth = lw;
+    }
+    const valueX = margin + maxLabelWidth + Math.max(26, w * 0.025);
+
+    rows.forEach((row, i) => {
+      const y = ruleY + h * 0.055 + i * metaSize * 2.05;
+      ctx.fillStyle = inkSoftOf(); ctx.fillText(row[0], margin, y);
+      ctx.fillStyle = inkOf(); ctx.fillText(row[1], valueX, y);
+    });
+
+    // The plate-mark itself: the settling cue described above, framing the
+    // whole title+metadata block. Silent (alpha 0) at the instant of the
+    // stamp; fully pressed in by STAMP_SETTLE seconds.
+    const frameTop = margin - h * 0.02;
+    const frameBottom = ruleY + h * 0.055 + (rows.length - 1) * metaSize * 2.05 + h * 0.018;
+    drawPlateMark(ctx, margin - h * 0.02, frameTop, w * 0.46, frameBottom - frameTop, settle, view ? view.dpr : 1);
+
+    ctx.fillStyle = inkSoftOf(); ctx.font = mono(metaSize * 0.86);
+    ctx.fillText(m.glyph.caption.toUpperCase(), margin, h - margin * 0.55);
+    ctx.globalAlpha = 1;
+  }
+
+  const box = { x: w * 0.5, y: h * 0.2, w: w * 0.44, h: h * 0.52 };
+  if (m.glyph.kind === "contour") drawContour(ctx, m.glyph.points, box, view, e, h);
+  else drawMatrixGlyph(ctx, m.glyph, box, cardAlpha, h);
+
+  ctx.restore();
+  return { scoreAlpha: e, done: u >= 1 };
+}
+
+function drawContour(ctx, points, box, view, e, h) {
+  if (points.length < 2) return;
+  const stroke = Math.max(1.2, h * 0.0032);
+
+  const at = (p) => {
+    const gx = box.x + p.u * box.w;
+    const gy = box.y + (1 - p.v) * box.h;
+    if (!view || e === 0) return [gx, gy];
+    const sx = xOfSec(view, p.sec, 0);
+    const sy = yOfMidi(view, p.midi) + view.rowH / 2;
+    if (e >= 1) return [sx, sy];
+    return [gx + (sx - gx) * e, gy + (sy - gy) * e];
+  };
+
+  const path = (dx, dy) => {
+    ctx.beginPath();
+    for (let i = 0; i < points.length; i++) {
+      const c = at(points[i]);
+      if (i === 0) ctx.moveTo(c[0] + dx, c[1] + dy);
+      else ctx.lineTo(c[0] + dx, c[1] + dy);
+    }
+  };
+
+  ctx.lineJoin = "round"; ctx.lineCap = "round";
+  ctx.strokeStyle = glowOf() + "0.9)";
+  ctx.lineWidth = stroke;
+  path(0, 0);
+  ctx.stroke();
+
+  const r = Math.max(1.6, h * 0.0042);
+  for (const p of points) {
+    if (p.pivot === "none") continue;
+    const c = at(p);
+    ctx.beginPath();
+    ctx.arc(c[0], c[1], r, 0, Math.PI * 2);
+    ctx.fillStyle = p.pivot === "suspension" ? THEME.accent : glowOf() + "0.98)";
+    ctx.fill();
+  }
+}
+
+function drawMatrixGlyph(ctx, glyph, box, alpha, h) {
+  if (alpha <= 0.004) return;
+  ctx.globalAlpha = alpha;
+  const rowH = box.h / glyph.rows;
+  const cellW = box.w / MATRIX_COLUMNS;
+
+  ctx.strokeStyle = ruleOf(); ctx.lineWidth = Math.max(1, h * 0.001); ctx.beginPath();
+  for (let r = 0; r <= glyph.rows; r++) {
+    const y = Math.round(box.y + r * rowH) + 0.5;
+    ctx.moveTo(box.x, y); ctx.lineTo(box.x + box.w, y);
+  }
+  ctx.stroke();
+
+  for (const cell of glyph.cells) {
+    ctx.fillStyle = glowOf() + (0.18 + cell.density * 0.72) + ")";
+    ctx.fillRect(box.x + cell.u * box.w, box.y + cell.row * rowH + rowH * 0.22,
+      Math.max(1, cellW * 0.8), rowH * 0.56);
+  }
+  ctx.globalAlpha = 1;
+}
+
+function wrapText(ctx, text, maxWidth) {
+  const words = String(text).split(/\s+/);
+  const lines = [];
+  let line = "";
+  for (const word of words) {
+    const next = line ? `${line} ${word}` : word;
+    if (ctx.measureText(next).width > maxWidth && line) { lines.push(line); line = word; }
+    else line = next;
+  }
+  if (line) lines.push(line);
+  return lines.slice(0, 3);
+}
+
+/* ==========================================================================
+ * 12. EXPORTS
+ * ========================================================================== */
+
+const THUMB_WIDTH = 1280, THUMB_HEIGHT = 720;
+
+async function renderFrameZero(score, monogram, width, height) {
+  width = width || THUMB_WIDTH; height = height || THUMB_HEIGHT;
+  if (document.fonts && document.fonts.ready) { try { await document.fonts.ready; } catch (e) {} }
+
+  const canvas = document.createElement("canvas");
+  canvas.width = width; canvas.height = height;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("2d context unavailable for export");
+
+  const m = width / PLATE.width;
+  ctx.setTransform(m, 0, 0, m, 0, 0);
+  drawMonogram(ctx, monogram, score, layoutView(score, m, 185), PLATE.width, PLATE.height, 0);
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  return canvas;
+}
+
+function canvasToBlob(canvas) {
+  return new Promise((resolve, reject) => {
+    canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error("Could not encode thumbnail."))), "image/png");
+  });
+}
+
+async function exportThumbnail(score, monogram, cached) {
+  return canvasToBlob(cached || (await renderFrameZero(score, monogram)));
+}
+
+function slug(text) {
+  return String(text).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "counterpoint";
+}
+
+function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = filename; a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+/* ==========================================================================
+ * 13. CONCERT PIANO ENGINE (Yamaha C5 Sampled Audio with Direct Master Tap)
+ * ========================================================================== */
+
+const SALAMANDER_BASE = "https://tonejs.github.io/audio/salamander/";
+const PIANO_NOTES = [
+  "A0", "C1", "D#1", "F#1", "A1", "C2", "D#2", "F#2", "A2", "C3", "D#3", "F#3",
+  "A3", "C4", "D#4", "F#4", "A4", "C5", "D#5", "F#5", "A5", "C6", "D#6", "F#6",
+  "A6", "C7", "D#7", "F#7", "A7", "C8",
+];
+
+const REVERB = { decay: 2.6, preDelay: 0.026, wet: 0.17 };
+
+/**
+ * Four distinct, always-selectable Baroque-appropriate voices.
+ *
+ * PIANO RELEASE: raised to the requested 1.15s so genuinely held chords
+ * decay and ring the way a real damper does, rather than choking off. But a
+ * FIXED 1.15s release on fast contrapuntal sixteenths is exactly what
+ * earlier made this instrument read as an organ: each note's tail is still
+ * ringing when the next one's tail begins, and overlapping tails sum into
+ * one undifferentiated wash. The resolution is release SCALED to each
+ * note's own sounded duration (see releaseFor() in AudioEngine.schedule) --
+ * a struck sixteenth decays quickly, the way it does on a real instrument
+ * when the next note interrupts it, while a held half note or final chord
+ * gets the full 1.15s bloom. Same base value, physically motivated instead
+ * of a single number fighting two different kinds of passage.
+ *
+ * VELOCITY-TRACKING FILTER: one dedicated per-channel Tone.Filter, its
+ * cutoff automated (not re-instantiated) at every note's onset from that
+ * note's own velocity, interpolated in LOG frequency space between the two
+ * anchors below (frequency perception is logarithmic; a linear Hz ramp
+ * would feel like nothing happens for the first half of the sweep and
+ * everything in the second half). This is what stops quiet notes sounding
+ * like a distant tinny clang: a soft strike keeps its warmth instead of
+ * being brightness-clamped to the same cutoff as a forte one.
+ *
+ * Harpsichord and organ do NOT get this same velocity-to-brightness curve:
+ * a real harpsichord's quill either plucks or does not (a few dB of level
+ * change, negligible timbre change), and a real pipe organ's speech has NO
+ * velocity dependence at all -- the valve is binary. Applying piano-style
+ * dynamics to either would be historically backwards, not "consistent."
+ */
+const VELOCITY_FILTER = { v0: 0.275, f0: 1600, v1: 0.925, f1: 12250, floor: 650, ceiling: 15000 };
+const FELT_VELOCITY_FILTER = { v0: 0.3, f0: 950, v1: 0.9, f1: 4400, floor: 500, ceiling: 6000 };
+
+/** Log-space interpolation between two (velocity, frequency) anchors. */
+function velocityToCutoff(vel, cfg) {
+  const v = Math.max(0.05, Math.min(1.05, vel));
+  const t = (v - cfg.v0) / (cfg.v1 - cfg.v0);
+  const logF = Math.log(cfg.f0) + t * (Math.log(cfg.f1) - Math.log(cfg.f0));
+  return Math.max(cfg.floor, Math.min(cfg.ceiling, Math.exp(logF)));
+}
+
+/**
+ * The high-shelf dampener's gain for a given velocity: soft strikes (at or
+ * below 0.35) get the full -5.5dB attenuation above 4.5kHz -- a warm, woody
+ * strike with the hammer's harder overtones held back; forte strikes (at or
+ * above 0.85) get none at all, letting the hammer's real bite through. This
+ * runs alongside velocityToCutoff's lowpass brightening rather than
+ * replacing it -- together they are the two-stage timbre model, not one
+ * filter doing both jobs.
+ */
+function velocityToDamperGain(vel) {
+  const v = Math.max(0.05, Math.min(1.05, vel));
+  const t = Math.max(0, Math.min(1, (v - 0.35) / (0.85 - 0.35)));
+  return -5.5 * (1 - t);
+}
+
+/**
+ * Real-time pitch-to-pan tracking: bass strings resonate gently to the
+ * left, treble strings to the right, exactly as they sit across a real
+ * soundboard -- replacing a fixed pan assigned once per voice at channel
+ * creation, which put an entire voice on one side regardless of how far its
+ * own line actually range over the keyboard.
+ */
+function pitchToPan(midi) {
+  return Math.max(-0.24, Math.min(0.24, ((midi - 60) / 48) * 0.22));
+}
+
+const INSTRUMENTS = {
+  piano: {
+    id: "piano", name: "Concert Grand Piano", kind: "sampler",
+    // 1.2s: comfortably inside the requested 1.15-1.25s acoustic-decay
+    // window rather than sitting exactly on its lower edge.
+    release: 1.2, volume: -2.2,
+    velocityFilter: VELOCITY_FILTER,
+    // "Soundboard warmth": a gentle presence lift in the body of the piano's
+    // tone, and a soft rolloff above the point where samples start reading
+    // as brittle/digital rather than as struck strings.
+    presence: { frequency: 340, gain: 2.4 },
+    rolloff: 11000,
+  },
+  feltPiano: {
+    id: "feltPiano", name: "Warm Felt Upright", kind: "sampler",
+    // Same Salamander recordings as the concert grand -- a felt mute doesn't
+    // change WHICH strings are recorded, it changes how much high-frequency
+    // hammer noise reaches them, which is exactly what the darker velocity
+    // filter and lower rolloff below do without a second sample download.
+    release: 0.85, volume: -5,
+    velocityFilter: FELT_VELOCITY_FILTER,
+    presence: { frequency: 300, gain: 1.1 },
+    rolloff: 5200,
+  },
+  harpsichord: {
+    id: "harpsichord", name: "Baroque Harpsichord", kind: "synth",
+    // A quill plucks a string: near-instant attack, fast decay to almost
+    // nothing (a harpsichord has no sustain pedal equivalent -- once
+    // plucked, the string is already dying), and a bright sawtooth for the
+    // harmonic richness a plectrum's scrape imparts. The dedicated highpass
+    // (not lowpass, unlike every other voice here) clears the boomy low end
+    // a plucked string doesn't really have, leaving the characteristic bite.
+    oscillator: { type: "sawtooth" },
+    envelope: { attack: 0.002, decay: 0.22, sustain: 0.03, release: 0.3 },
+    filterType: "highpass", filterFrequency: 480, filterQ: 0.9,
+    volume: -9,
+  },
+  organ: {
+    id: "organ", name: "Cathedral Pipe Organ", kind: "organStops",
+    // A real pipe chorus is additive: multiple ranks (stops) sounding
+    // together at different pitches. Three layered PolySynth voices per
+    // channel -- 8' fundamental, 4' at the octave, 2-2/3' a twelfth above --
+    // mixed at decreasing volume, is the classic principal-chorus
+    // registration and is what actually reads as "organ" rather than "one
+    // oscillator." Full sustain while a key is held (organs don't decay the
+    // way a struck string does), fast speech, and a release closer to how
+    // quickly a real pipe stops singing once the key lifts.
+    stops: [
+      { semitones: 0, gain: 1.0, oscillator: { type: "triangle" } },
+      { semitones: 12, gain: 0.42, oscillator: { type: "sine" } },
+      { semitones: 19, gain: 0.16, oscillator: { type: "sine" } },
+    ],
+    envelope: { attack: 0.02, decay: 0.05, sustain: 0.88, release: 0.32 },
+    filterFrequency: 5200,
+    volume: -7,
+  },
+};
+const DEFAULT_INSTRUMENT = "piano";
+// Presentation order in the dropdown, matching the brief's own numbered list
+// (Concert Grand, Harpsichord, Cathedral Organ, Felt Upright) rather than the
+// registry's insertion order, which groups the two sampler-based voices
+// together for readability in the source and would otherwise leak into the UI.
+const INSTRUMENT_UI_ORDER = ["piano", "harpsichord", "organ", "feltPiano"];
+const INSTRUMENT_LOAD_TIMEOUT_MS = 12000;
+
+function panPosition(index, count) {
+  if (count <= 1) return 0;
+  const SPREAD = 0.35;
+  return -SPREAD + (index * 2 * SPREAD) / (count - 1);
+}
+
+function headroomGain(activeVoices, base) {
+  const n = Math.max(1, activeVoices);
+  return Math.min(base, base / Math.sqrt(n));
+}
+
+let pianoBuffers = null;
+let pianoLoad = null;
+
+function loadPiano() {
+  if (pianoLoad) return pianoLoad;
+  pianoLoad = new Promise((resolve, reject) => {
+    const urls = {};
+    for (const note of PIANO_NOTES) urls[note] = note.replace("#", "s") + ".mp3";
+    const buffers = new Tone.ToneAudioBuffers({
+      urls,
+      baseUrl: SALAMANDER_BASE,
+      onload: () => { pianoBuffers = buffers; resolve(buffers); },
+      onerror: (err) => reject(err),
+    });
+  });
+  return pianoLoad;
+}
+
+class AudioEngine {
+  constructor() {
+    this.channels = new Map();
+    this.score = null;
+    this.scale = 1.0;
+    this.started = false;
+    this.ready = false;
+    this.masterBase = 0.92;
+
+    this.busIn = new Tone.Gain(1);
+    this.master = new Tone.Gain(this.masterBase);
+    this.monitor = new Tone.Gain(1);
+
+    // Soundboard body resonance. This REVERSES an earlier "the bus should
+    // stay neutral" decision made when only one instrument existed and
+    // per-instrument colouring made a shared bus-wide EQ redundant. It is
+    // applied to busIn -- shared by every instrument, piano or not -- per
+    // the explicit target given; a touch of soundboard-like warmth costs
+    // nothing on the synthesized voices and is exactly what real acoustic
+    // instruments have that pure synthesis otherwise lacks.
+    this.bodyBoost = new Tone.Filter({ type: "peaking", frequency: 320, gain: 2.4, Q: 1.0 });
+    this.antiMud = new Tone.Filter({ type: "peaking", frequency: 660, gain: -1.6, Q: 1.3 });
+    this.airShelf = new Tone.Filter({ type: "highshelf", frequency: 11500, gain: -2.5 });
+    this.busIn.connect(this.bodyBoost);
+    this.bodyBoost.connect(this.antiMud);
+    this.antiMud.connect(this.airShelf);
+
+    // Manual dry/wet split rather than Tone.Reverb's own internal crossfade,
+    // specifically so "HF damping above 3600Hz to prevent metallic pinging"
+    // can apply to the WET tail only -- the dry signal must stay exactly as
+    // bright as the EQ above left it. Reverb itself is built at wet:1.0 (a
+    // fully wet processor, contributing no dry copy of its own), so drySend
+    // and the damped wet path are two genuinely separate signal components
+    // summing at master, not two copies of the same one -- the "exactly one
+    // path for the dry signal" principle established earlier still holds,
+    // it is just that the dry path is now built explicitly rather than
+    // implicitly inside the Reverb node.
+    this.drySend = new Tone.Gain(1 - REVERB.wet);
+    this.wetSend = new Tone.Gain(REVERB.wet);
+    this.airShelf.connect(this.drySend);
+    this.airShelf.connect(this.wetSend);
+
+    this.limiter = new Tone.Limiter(-0.5);
+    this.drySend.connect(this.master);
+    try {
+      this.reverb = new Tone.Reverb({ decay: REVERB.decay, preDelay: REVERB.preDelay, wet: 1.0 });
+      this.reverbDamp = new Tone.Filter({ type: "lowpass", frequency: 3600, Q: 0.5 });
+      this.wetSend.connect(this.reverb);
+      this.reverb.connect(this.reverbDamp);
+      this.reverbDamp.connect(this.master);
+    } catch (err) {
+      this.reverb = null;
+      this.reverbDamp = null;
+      // Reverb unavailable -- route the wet send straight to master instead
+      // of losing that portion of the signal entirely.
+      this.wetSend.connect(this.master);
+    }
+
+    this.master.connect(this.limiter);
+    this.limiter.connect(this.monitor);
+    this.monitor.toDestination();
+
+    this.recordTap = Tone.getContext().createMediaStreamDestination();
+    Tone.connect(this.limiter, this.recordTap);
+
+    this.monitorMuted = false;
+    this.instrumentId = DEFAULT_INSTRUMENT;
+    this.pianoUnavailable = false;
+    this.pianoLoadPromise = null;
+  }
+
+  mediaStream() {
+    return this.recordTap.stream;
+  }
+
+  setMonitor(on) {
+    this.monitorMuted = !on;
+    this.monitor.gain.rampTo(on ? 1 : 0, 0.02);
+  }
+  toggleMonitor() { this.setMonitor(this.monitorMuted); return !this.monitorMuted; }
+
+  updateHeadroom(activeVoices) {
+    const g = headroomGain(activeVoices, this.masterBase);
+    this.master.gain.rampTo(g, 0.08);
+    return g;
+  }
+
+  get transport() { return Tone.getTransport(); }
+  get scoreSeconds() { return this.transport.seconds * this.scale; }
+  get loaded() { return this.ready; }
+  /** True once the real acoustic samples are decoded and confirmed usable. */
+  get pianoReady() { return !!pianoBuffers && !this.pianoUnavailable; }
+
+  /**
+   * Starts fetching and decoding the acoustic piano samples immediately,
+   * before any user gesture or instrument selection -- decoding audio data
+   * does not require a running AudioContext, only actually SOUNDING it does.
+   * This is what makes the "pre-export buffer lock" meaningful in practice:
+   * by the time a user gets around to clicking Export Video, loading has
+   * very often already finished in the background rather than starting from
+   * zero at that moment. loadPiano() itself is memoized, so calling this
+   * again later (e.g. from unlock()) is a cheap no-op if already in flight.
+   */
+  beginEagerPianoLoad() {
+    if (this.pianoLoadPromise) return this.pianoLoadPromise;
+    this.pianoLoadPromise = loadPiano().then(() => Tone.loaded()).then(() => {
+      this.pianoUnavailable = false;
+      return true;
+    }).catch((err) => {
+      console.warn("[audio] Piano samples failed to preload.", err);
+      this.pianoUnavailable = true;
+      return false;
+    });
+    return this.pianoLoadPromise;
+  }
+
+  /**
+   * Resumes the AudioContext, then makes sure the CURRENTLY SELECTED
+   * instrument is actually ready to sound.
+   *
+   * Organ and harpsichord need nothing but the context: pure synthesis, zero
+   * load time, work offline. Piano and felt upright need the sample set,
+   * which is a real network fetch and deserves a real chance to succeed
+   * rather than a short race that silently swaps in a different instrument
+   * the user did not choose -- that exact swap is what made "the piano"
+   * sound like an organ in practice before, regardless of how the Sampler
+   * itself was tuned. 12 seconds is generous; if it still fails (genuinely
+   * offline, blocked by CORS on file://), the organ is offered explicitly.
+   */
+  async unlock() {
+    try {
+      if (Tone.context.state !== "running") await Tone.start();
+      const raw = Tone.context.rawContext;
+      if (raw && raw.state === "suspended" && raw.resume) await raw.resume();
+      this.started = true;
+    } catch (e) {}
+
+    const wantsPiano = (INSTRUMENTS[this.instrumentId] || {}).kind === "sampler";
+    if (!wantsPiano) {
+      this.ready = true;
+      this.attachInstruments();
+      // Piano samples load in the background regardless, so switching to a
+      // piano voice later doesn't make the user wait from zero.
+      this.beginEagerPianoLoad();
+      return;
+    }
+
+    if (this.ready && !this.pianoUnavailable) { this.attachInstruments(); return; }
+
+    try {
+      const timeout = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error("Timeout")), INSTRUMENT_LOAD_TIMEOUT_MS));
+      await Promise.race([loadPiano().then(() => Tone.loaded()), timeout]);
+      this.pianoUnavailable = false;
+    } catch (err) {
+      console.warn("[audio] Piano samples unavailable; use the instrument selector to pick a synthesized voice.", err);
+      this.pianoUnavailable = true;
+      this.instrumentId = "organ";
+    }
+    this.ready = true;
+    this.attachInstruments();
+  }
+
+  /** Disposes whichever instrument nodes a channel currently has, regardless of which of the 4 kinds built them. */
+  disposeChannelInstrument(ch) {
+    if (ch.inst) ch.inst.dispose();
+    if (ch.filter) ch.filter.dispose();
+    if (ch.velFilter) ch.velFilter.dispose();
+    if (ch.dampFilter) ch.dampFilter.dispose();
+    if (ch.presenceFilter) ch.presenceFilter.dispose();
+    if (ch.rolloffFilter) ch.rolloffFilter.dispose();
+    if (ch.stops) for (const s of ch.stops) s.synth.dispose();
+    ch.inst = null; ch.filter = null; ch.velFilter = null; ch.dampFilter = null;
+    ch.presenceFilter = null; ch.rolloffFilter = null; ch.stops = null;
+  }
+
+  /**
+   * Switches every channel's instrument without touching the Tone.Part
+   * schedule or the transport position -- the Part callback reads `ch.inst`
+   * (or `ch.stops`) fresh at fire time, so a mid-playback switch is
+   * seamless. Falls back to the organ, with a clear reason, if the piano's
+   * samples never loaded.
+   */
+  async setInstrument(id) {
+    if ((id === "piano" || id === "feltPiano") && this.pianoUnavailable) id = "organ";
+    if (id === this.instrumentId) return this.instrumentId;
+    this.instrumentId = id;
+    if ((id === "piano" || id === "feltPiano") && !pianoBuffers && !this.pianoUnavailable) {
+      try {
+        const timeout = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error("Timeout")), INSTRUMENT_LOAD_TIMEOUT_MS));
+        await Promise.race([loadPiano().then(() => Tone.loaded()), timeout]);
+      } catch (err) {
+        this.pianoUnavailable = true;
+        this.instrumentId = "organ";
+      }
+    }
+    for (const ch of this.channels.values()) this.disposeChannelInstrument(ch);
+    this.attachInstruments();
+    return this.instrumentId;
+  }
+
+  /** Builds and connects one channel's instrument for the currently selected id. */
+  attachInstruments() {
+    if (!this.ready) return;
+    const cfg = INSTRUMENTS[this.instrumentId] || INSTRUMENTS[DEFAULT_INSTRUMENT];
+    const useFallback = (cfg.kind === "sampler") && (this.pianoUnavailable || !pianoBuffers);
+    const effectiveKind = useFallback ? "organStops" : cfg.kind;
+    const effectiveCfg = useFallback ? INSTRUMENTS.organ : cfg;
+
+    for (const ch of this.channels.values()) {
+      if (ch.inst || ch.stops) continue;
+
+      if (effectiveKind === "sampler") {
+        const urls = {};
+        for (const note of PIANO_NOTES) urls[note] = pianoBuffers.get(note);
+        const sampler = new Tone.Sampler({ urls, release: effectiveCfg.release });
+        sampler.volume.value = effectiveCfg.volume;
+        // Velocity-tracking brightness: one dedicated filter per channel,
+        // automated per note (see schedule()) rather than rebuilt per note.
+        const velFilter = new Tone.Filter(effectiveCfg.velocityFilter.f1, "lowpass");
+        // High-shelf dampener: the second half of the two-stage velocity
+        // timbre model -- soft strikes lose some hammer-bite brightness
+        // above 4.5kHz on top of (not instead of) the lowpass above.
+        const dampFilter = new Tone.Filter({ type: "highshelf", frequency: 4500, gain: 0 });
+        // Soundboard presence: a gentle peaking lift in the instrument's body.
+        const presenceFilter = new Tone.Filter({
+          type: "peaking", frequency: effectiveCfg.presence.frequency, gain: effectiveCfg.presence.gain, Q: 0.9,
+        });
+        const rolloffFilter = new Tone.Filter(effectiveCfg.rolloff, "lowpass");
+        sampler.connect(velFilter);
+        velFilter.connect(dampFilter);
+        dampFilter.connect(presenceFilter);
+        presenceFilter.connect(rolloffFilter);
+        rolloffFilter.connect(ch.panner);
+        ch.inst = sampler; ch.velFilter = velFilter; ch.dampFilter = dampFilter;
+        ch.presenceFilter = presenceFilter; ch.rolloffFilter = rolloffFilter;
+      } else if (effectiveKind === "organStops") {
+        const filter = new Tone.Filter(effectiveCfg.filterFrequency, "lowpass");
+        filter.connect(ch.panner);
+        ch.filter = filter;
+        ch.stops = effectiveCfg.stops.map((stop) => {
+          const synth = new Tone.PolySynth(Tone.Synth, {
+            oscillator: stop.oscillator,
+            envelope: effectiveCfg.envelope,
+            // Each stop's own volume, in dB, from its linear mix gain --
+            // this is the "octave harmonics" layering, not a single wave.
+            volume: effectiveCfg.volume + 20 * Math.log10(Math.max(0.001, stop.gain)),
+          });
+          synth.connect(filter);
+          return { synth, semitones: stop.semitones };
+        });
+      } else {
+        // "synth": harpsichord -- a single bright voice through its own
+        // dedicated highpass, unlike every other voice here which lowpasses.
+        const filter = new Tone.Filter({ type: effectiveCfg.filterType, frequency: effectiveCfg.filterFrequency, Q: effectiveCfg.filterQ });
+        const synth = new Tone.PolySynth(Tone.Synth, {
+          oscillator: effectiveCfg.oscillator,
+          envelope: effectiveCfg.envelope,
+          volume: effectiveCfg.volume,
+        });
+        synth.connect(filter);
+        filter.connect(ch.panner);
+        ch.inst = synth; ch.filter = filter;
+      }
+    }
+  }
+
+  setTempo(factor) {
+    const next = Math.max(0.4, Math.min(2.0, factor));
+    if (Math.abs(next - this.scale) < 0.001) return;
+    const at = this.scoreSeconds;
+    const wasPlaying = this.transport.state === "started";
+    this.transport.pause();
+    this.scale = next;
+    this.schedule();
+    this.seek(at);
+    if (wasPlaying) this.transport.start();
+  }
+
+  teardown() {
+    this.transport.stop();
+    this.transport.cancel(0);
+    this.transport.seconds = 0;
+    this.releaseAll();
+    this.disposeParts();
+    for (const ch of this.channels.values()) {
+      this.disposeChannelInstrument(ch);
+      ch.panner.dispose(); ch.gain.dispose();
+    }
+    this.channels.clear();
+    this.score = null;
+  }
+
+  load(score) {
+    this.teardown();
+    this.score = score;
+    const n = score.voices.length;
+    score.voices.forEach((voice, i) => {
+      const gain = new Tone.Gain(1).connect(this.busIn);
+      const panner = new Tone.Panner(panPosition(i, n)).connect(gain);
+      this.channels.set(voice.id, {
+        inst: null, filter: null, velFilter: null, presenceFilter: null,
+        rolloffFilter: null, stops: null, panner, gain, part: null,
+      });
+    });
+    this.updateHeadroom(n);
+    this.attachInstruments();
+    this.schedule();
+  }
+
+  /**
+   * Release scaled to the note's own sounded duration. A struck sixteenth
+   * decays quickly (the way it does on a real instrument once the next note
+   * interrupts it); a held chord or final note gets the full natural bloom
+   * up to `base`. This is what lets a single 1.15s base release satisfy both
+   * "chords ring naturally" and "fast counterpoint stays articulate" instead
+   * of the two fighting each other.
+   */
+  releaseFor(dur, base) {
+    return Math.max(0.12, Math.min(base, dur * 0.9));
+  }
+
+  schedule() {
+    if (!this.score) return;
+    this.disposeParts();
+    const cfg = INSTRUMENTS[this.instrumentId] || INSTRUMENTS[DEFAULT_INSTRUMENT];
+    for (const voice of this.score.voices) {
+      const ch = this.channels.get(voice.id);
+      if (!ch) continue;
+      const events = voice.notes.map((n) => {
+        const dur = Math.max(0.06, (n.endSec - n.startSec) / this.scale);
+        return {
+          time: n.startSec / this.scale,
+          midi: n.midi,
+          note: Tone.Frequency(n.midi, "midi").toNote(),
+          dur,
+          // Preserve the source file's own dynamics. A small floor (silent
+          // notes are never useful) and a gentle presence lift are kept, but
+          // the shape of the source dynamics survives across nearly the
+          // whole range.
+          vel: Math.max(0.08, Math.min(1.0, (n.vel || 0.72) * 1.05 + 0.04)),
+          release: this.releaseFor(dur, cfg.kind === "sampler" ? cfg.release : 0),
+        };
+      });
+      const part = new Tone.Part((time, ev) => {
+        // Pitch-to-pan tracking applies before the instrument-kind branch --
+        // both the sampler path and the organ's stacked stops share the
+        // same single ch.panner, so this sets it once per note regardless
+        // of which path fires next.
+        ch.panner.pan.setTargetAtTime(pitchToPan(ev.midi), time, 0.006);
+
+        if (ch.stops) {
+          // Cathedral organ: fire every stop together, each transposed by
+          // its own rank interval.
+          for (const stop of ch.stops) {
+            if (!stop.synth || stop.synth.disposed) continue;
+            try {
+              const note = Tone.Frequency(ev.midi + stop.semitones, "midi").toNote();
+              stop.synth.triggerAttackRelease(note, ev.dur, time, ev.vel);
+            } catch (err) {}
+          }
+          return;
+        }
+        const inst = ch.inst;
+        if (!inst || inst.disposed) return;
+        const activeCfg = INSTRUMENTS[this.instrumentId] || INSTRUMENTS[DEFAULT_INSTRUMENT];
+        // setTargetAtTime rather than setValueAtTime for both stages of the
+        // velocity timbre model: an instant jump on a fast contrapuntal run
+        // is exactly what produces an audible digital "step" between
+        // adjacent notes. A 6ms time constant is short enough to still read
+        // as immediate but long enough to round off that step completely.
+        if (ch.velFilter && !ch.velFilter.disposed && activeCfg.velocityFilter) {
+          ch.velFilter.frequency.setTargetAtTime(velocityToCutoff(ev.vel, activeCfg.velocityFilter), time, 0.006);
+        }
+        if (ch.dampFilter && !ch.dampFilter.disposed) {
+          ch.dampFilter.gain.setTargetAtTime(velocityToDamperGain(ev.vel), time, 0.006);
+        }
+        try {
+          if (ev.release > 0 && "release" in inst) inst.release = ev.release;
+          inst.triggerAttackRelease(ev.note, ev.dur, time, ev.vel);
+        } catch (err) {}
+      }, events);
+      part.start(0);
+      ch.part = part;
+    }
+  }
+
+  disposeParts() {
+    for (const ch of this.channels.values()) {
+      if (ch.part) ch.part.dispose();
+      ch.part = null;
+    }
+  }
+
+  play() { this.transport.start(); }
+  pause() { this.transport.pause(); this.releaseAll(); }
+
+  seek(scoreSec) {
+    const clamped = Math.max(0, Math.min(scoreSec, this.score ? this.score.durSec : 0));
+    this.transport.seconds = clamped / this.scale;
+    this.releaseAll();
+  }
+
+  applyMix(isAudible) {
+    let active = 0;
+    for (const [id, ch] of this.channels) {
+      const audible = isAudible(id);
+      if (audible) active++;
+      ch.gain.gain.rampTo(audible ? 1 : 0, 0.03);
+      if (!audible) this.releaseChannel(ch);
+    }
+    this.updateHeadroom(active);
+  }
+
+  /** Releases whichever voice(s) a channel currently has -- a single
+   *  instrument, or (for the multi-stop organ) every rank at once. */
+  releaseChannel(ch) {
+    if (ch.inst) ch.inst.releaseAll();
+    if (ch.stops) for (const s of ch.stops) if (s.synth) s.synth.releaseAll();
+  }
+
+  releaseAll() { for (const ch of this.channels.values()) this.releaseChannel(ch); }
+  dispose() {
+    this.teardown();
+    for (const node of [this.busIn, this.bodyBoost, this.antiMud, this.airShelf,
+      this.drySend, this.wetSend, this.reverb, this.reverbDamp, this.limiter,
+      this.master, this.monitor]) {
+      if (node) node.dispose();
+    }
+  }
+}
+
+/* ==========================================================================
+ * 14. STORE & RENDERER (Strict Infallible Boundary Clipping)
+ * ========================================================================== */
+
+class Store {
+  constructor() {
+    this.state = {
+      score: null, analysis: null,
+      theme: DEFAULT_THEME, audioReady: false,
+      playing: false, tempoScale: 1.0,
+      pxPerSec: 225,
+      presentation: false,
+    };
+    this.listeners = new Set();
+  }
+  get() { return this.state; }
+  set(patch) {
+    const changed = new Set();
+    for (const key of Object.keys(patch)) {
+      if (patch[key] !== undefined && patch[key] !== this.state[key]) {
+        this.state[key] = patch[key];
+        changed.add(key);
+      }
+    }
+    if (changed.size === 0) return;
+    for (const fn of this.listeners) fn(this.state, changed);
+  }
+  subscribe(fn) { this.listeners.add(fn); return () => this.listeners.delete(fn); }
+  isAudible() { return true; }
+}
+
+const MINIMAP_HEIGHT = 28;
+const EMPTY_TAGS = new Uint8Array(0);
+
+/**
+ * Weather-like inertia: how open or close the frame feels, tracking the
+ * texture's actual density over many seconds rather than reacting to it.
+ *
+ * A large, cheap radial gradient rather than a pixel-level regeneration of
+ * the paper texture -- the cached parchment stays exactly as it is; this is
+ * a soft compositing pass on top of it, the same way a colour-grade vignette
+ * sits on top of a finished frame rather than being baked into the set.
+ * Deliberately tiny in range (a ~10% swing in the transparent zone's own
+ * radius, capped at 5% darkening at the very outer edge) -- the brief is
+ * "nearly subconscious," and both numbers are sized to fail an "can you see
+ * it happening" test while still being present in a side-by-side still.
+ */
+function drawBreathingVignette(ctx, view, densityEMA, isDark) {
+  const cx = (view.left + view.right) / 2;
+  const cy = (view.top + view.bottom) / 2;
+  const maxR = Math.hypot(view.right - view.left, view.bottom - view.top) / 2;
+  const innerR = maxR * (0.78 + densityEMA * 0.10);
+  const outerR = maxR * 1.05;
+  const grad = ctx.createRadialGradient(cx, cy, Math.max(0, innerR), cx, cy, outerR);
+  const tint = isDark ? "0,0,0" : "20,14,6";
+  grad.addColorStop(0, `rgba(${tint},0)`);
+  grad.addColorStop(1, `rgba(${tint},0.05)`);
+  ctx.fillStyle = grad;
+  ctx.fillRect(view.left - 40, view.top - 40, view.right - view.left + 80, view.bottom - view.top + 80);
+}
+
+class Renderer {
+  constructor(staticCanvas, dynamicCanvas, minimapCanvas, store, engine) {
+    this.staticCanvas = staticCanvas;
+    this.dynamicCanvas = dynamicCanvas;
+    this.minimapCanvas = minimapCanvas;
+    this.store = store;
+    this.engine = engine;
+    this.staticCtx = staticCanvas.getContext("2d", { alpha: false });
+    this.dynamicCtx = dynamicCanvas.getContext("2d", { alpha: true });
+    this.minimapCtx = minimapCanvas.getContext("2d", { alpha: true });
+
+    this.view = null; this.score = null; this.analysis = null; this.raf = 0;
+    this.cursors = []; this.maxDur = []; this.scratch = [];
+    this.thematicNow = new Uint8Array(0);
+    this.voiceRow = new Map();
+    this.rowOf = new Int32Array(0);
+    // Intentional permanent no-op: several call sites elsewhere (tempo
+    // changes, instrument switches, file loads, errors) still call
+    // renderer.console.push(...) for what used to feed the on-screen debug
+    // log. The log itself, and the DOM Console class that rendered it, are
+    // gone per the "no diagnostics console" brief -- rather than hunt down
+    // every scattered call site, this keeps them all valid, silent no-ops.
+    this.console = { push() {}, clear() {} };
+    this.lastWindowStart = -Infinity;
+    this.staticDirty = true;
+    this.minimapSize = { width: 0, height: MINIMAP_HEIGHT };
+    this.frames = 0; this.fpsAt = 0;
+    this.paper = null;
+    this.fit = null;
+    this.showRules = true;
+    this.densityEMA = 0;
+    this.lastFrameNow = performance.now();
+    this.tensionBuf = [];
+    this.aspectMode = "landscape";
+    this.lastPullBack = 0;
+    this.win = { start: 0, end: 0 };
+    this.state = { audible: true, spotlight: false, highlight: false, motifOf: EMPTY_TAGS };
+    this.staticOpacity = 1;
+    this.clockNow = () => performance.now();
+    this.out = { drawn: 0, sounding: 0 };
+    this.capture = null;
+    this.leftFade = null;
+    this.rightFade = null;
+    this.stats = { fps: 0, drawn: 0, sounding: 0, thematicVoices: 0 };
+    this.prologue = new Prologue();
+    this.onFrame = null;
+    this.onPrologueEnd = null;
+
+    store.subscribe((s, changed) => {
+      if (changed.has("pxPerSec") || changed.has("presentation")) this.staticDirty = true;
+    });
+  }
+
+  reset() {
+    this.stop();
+    this.prologue.cancel();
+    this.score = null; this.analysis = null; this.view = null;
+    this.cursors = []; this.maxDur = []; this.scratch = [];
+    this.thematicNow = new Uint8Array(0);
+    this.voiceRow = new Map();
+    this.rowOf = new Int32Array(0);
+    this.lastWindowStart = -Infinity;
+    this.lastPullBack = 0;
+    this.staticOpacity = -1;
+    this.setStaticOpacity(1);
+    this.clear();
+  }
+
+  clear() {
+    for (const [ctx, canvas] of [
+      [this.staticCtx, this.staticCanvas],
+      [this.dynamicCtx, this.dynamicCanvas],
+      [this.minimapCtx, this.minimapCanvas],
+    ]) {
+      ctx.save();
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.restore();
+    }
+  }
+
+  setScore(score, analysis) {
+    this.score = score;
+    this.analysis = analysis || null;
+    this.cursors = score.voices.map(() => 0);
+    this.scratch = score.voices.map(() => ({}));
+    this.thematicNow = new Uint8Array(score.voices.length);
+    this.voiceRow = new Map(score.voices.map((v, i) => [v.id, i]));
+    let maxId = 0;
+    for (const v of score.voices) if (v.id > maxId) maxId = v.id;
+    this.rowOf = new Int32Array(maxId + 1).fill(-1);
+    score.voices.forEach((v, i) => { this.rowOf[v.id] = i; });
+    this.maxDur = score.voices.map((v) => {
+      let m = 0;
+      for (const n of v.notes) m = Math.max(m, n.endSec - n.startSec);
+      return m;
+    });
+    this.lastWindowStart = -Infinity;
+    this.staticDirty = true;
+    this.resize();
+  }
+
+  resize() {
+    if (!this.score) return;
+    const parent = this.dynamicCanvas.parentElement;
+    if (!parent) return;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const width = parent.clientWidth, height = parent.clientHeight;
+    if (!(width > 0) || !(height > 0)) return;
+
+    const fit = this.aspectMode === "shorts"
+      ? plateFitCover(width, height, platePlayheadX())
+      : plateFit(width, height);
+    fit.deviceScale = fit.scale * dpr;
+    fit.dpr = dpr;
+    fit.txDevice = Math.round(fit.offsetX * dpr);
+    fit.tyDevice = Math.round(fit.offsetY * dpr);
+    this.fit = fit;
+
+    for (const c of [this.staticCanvas, this.dynamicCanvas]) {
+      c.width = Math.round(width * dpr);
+      c.height = Math.round(height * dpr);
+      c.style.width = width + "px";
+      c.style.height = height + "px";
+    }
+    const m = fit.deviceScale;
+    for (const ctx of [this.staticCtx, this.dynamicCtx]) {
+      ctx.setTransform(m, 0, 0, m, Math.round(fit.offsetX * dpr), Math.round(fit.offsetY * dpr));
+    }
+
+    const mmParent = this.minimapCanvas.parentElement;
+    const mmWidth = (mmParent && mmParent.clientWidth) || width;
+    this.minimapCanvas.width = Math.round(mmWidth * dpr);
+    this.minimapCanvas.height = Math.round(MINIMAP_HEIGHT * dpr);
+    this.minimapCanvas.style.width = mmWidth + "px";
+    this.minimapCanvas.style.height = MINIMAP_HEIGHT + "px";
+    this.minimapCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    this.minimapSize = { width: mmWidth, height: MINIMAP_HEIGHT };
+
+    this.view = layoutView(this.score, m, this.store.get().pxPerSec);
+    this.paper = null;
+    this.staticDirty = true;
+
+    const fadeWidth = 32;
+    const leftFade = this.dynamicCtx.createLinearGradient(this.view.left, 0, this.view.left + fadeWidth, 0);
+    leftFade.addColorStop(0, "rgba(0,0,0,1)");
+    leftFade.addColorStop(1, "rgba(0,0,0,0)");
+    this.leftFade = leftFade;
+
+    const rightFade = this.dynamicCtx.createLinearGradient(this.view.right - fadeWidth, 0, this.view.right, 0);
+    rightFade.addColorStop(0, "rgba(0,0,0,0)");
+    rightFade.addColorStop(1, "rgba(0,0,0,1)");
+    this.rightFade = rightFade;
+  }
+
+  /**
+   * Switches between Landscape (16:9, contain-fit) and Shorts (9:16,
+   * cover-fit centered on the playhead). Toggles the body class that
+   * reshapes #stage itself -- resize() reads the new shape immediately
+   * after, so the plate re-fits to the new box in the very next call.
+   */
+  setAspectMode(mode) {
+    if (mode !== "landscape" && mode !== "shorts") return;
+    if (this.aspectMode === mode) return;
+    this.aspectMode = mode;
+    document.body.classList.toggle("shorts-mode", mode === "shorts");
+    this.resize();
+  }
+
+  getView() { return this.view; }
+  beginPrologue(monogram) { this.prologue.begin(monogram, performance.now()); }
+  skipPrologue() {
+    if (!this.prologue.active) return;
+    this.prologue.cancel();
+    this.staticCanvas.style.opacity = "1";
+    if (this.onPrologueEnd) this.onPrologueEnd();
+  }
+
+  start() {
+    if (this.raf) return;
+    const tick = () => { this.raf = requestAnimationFrame(tick); this.frame(); };
+    this.raf = requestAnimationFrame(tick);
+  }
+  stop() { cancelAnimationFrame(this.raf); this.raf = 0; }
+
+  setStaticOpacity(a) {
+    if (this.staticOpacity === a) return;
+    this.staticOpacity = a;
+    this.staticCanvas.style.opacity = a === 1 ? "1" : String(a);
+  }
+
+  setCaptureTarget(canvas) {
+    this.capture = canvas ? { canvas, ctx: canvas.getContext("2d") } : null;
+  }
+
+  frame() {
+    const score = this.score;
+    let view = this.view;
+    if (this.staticCanvas.width === 0 || this.dynamicCanvas.width === 0) return;
+    if (!score || !view || !(view.width > 0) || !(view.height > 0) || !(view.rowH > 0)) return;
+    if (score.voices.length === 0 || this.scratch.length !== score.voices.length) return;
+
+    const wantPx = this.store.get().pxPerSec;
+    if (view.pxPerSec !== wantPx) { view.pxPerSec = wantPx; this.staticDirty = true; }
+
+    const t = this.engine.scoreSeconds;
+
+    // Cadence pull-back: recomputed only in the rare window near a piece's
+    // end (its final measure through a few seconds into the reverb tail),
+    // so every ordinary frame elsewhere pays nothing for this. Margins
+    // widen via a smoothstep ease -- "slow and stately," not a linear creep
+    // -- and reset the instant a seek lands back before the final measure.
+    let pullBack = 0;
+    if (score.measures.length > 0) {
+      const lastMeasureStart = score.measures[score.measures.length - 1].startSec;
+      const tailEnd = score.durSec + 2.5;
+      if (t >= lastMeasureStart && tailEnd > lastMeasureStart) {
+        const raw = Math.max(0, Math.min(1, (t - lastMeasureStart) / (tailEnd - lastMeasureStart)));
+        pullBack = raw * raw * (3 - 2 * raw);
+      }
+    }
+    if (Math.abs(pullBack - this.lastPullBack) > 0.001) {
+      view = layoutView(score, view.dpr, view.pxPerSec, undefined, pullBack);
+      this.view = view;
+      this.staticDirty = true; // margins moved -> the cached rule-line layer must redraw at the new bounds
+      this.lastPullBack = pullBack;
+    }
+
+    const win = visibleWindow(view, t, this.win);
+    const ws = win.start, we = win.end;
+
+    if (this.staticDirty) {
+      if (!this.paper) this.paper = makePaper(PLATE.width, PLATE.height);
+      drawPaper(this.staticCtx, score, view, this.paper, this.showRules, this.staticCanvas);
+      this.staticDirty = false;
+    }
+
+    const ctx = this.dynamicCtx;
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, this.dynamicCanvas.width, this.dynamicCanvas.height);
+    ctx.restore();
+
+    const prologueActive = this.prologue.active;
+    if (prologueActive) {
+      const a = ease(unfoldFraction(this.prologue.elapsed(this.clockNow())));
+      ctx.globalAlpha = a;
+      this.setStaticOpacity(a);
+    }
+
+    if (this.showRules) drawRules(ctx, score, view, t, ws, we);
+
+    const rewound = ws < this.lastWindowStart;
+    this.lastWindowStart = ws;
+
+    let drawn = 0, sounding = 0, voicesSounding = 0;
+    this.tensionBuf.length = 0;
+
+    // Strict boundary clipping: ensures thick woodblock slugs never leak outside margins
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(view.left, view.top - 6, view.innerW, view.innerH + 12);
+    ctx.clip();
+
+    ctx.globalCompositeOperation = THEME.blend;
+
+    for (let vi = 0; vi < score.voices.length; vi++) {
+      const voice = score.voices[vi];
+      const sc = this.scratch[vi];
+      if (!voice || !sc || !voice.palette) continue;
+      const margin = ws - this.maxDur[vi];
+      let cursor = this.cursors[vi];
+      if (rewound) cursor = lowerBoundSec(voice.notes, margin);
+      else while (cursor < voice.notes.length && voice.notes[cursor].startSec < margin) cursor++;
+      this.cursors[vi] = cursor;
+
+      drawVoiceNotes(ctx, voice, view, t, cursor, ws, we, this.state, sc, this.out, this.tensionBuf);
+      drawn += this.out.drawn;
+      sounding += this.out.sounding;
+      if (this.out.sounding > 0) voicesSounding++;
+    }
+
+    drawCapillaryTension(ctx, this.tensionBuf, view.dpr);
+
+    // Soft Edge Fading inside plate bounds only
+    if (this.leftFade && this.rightFade) {
+      ctx.globalCompositeOperation = "destination-out";
+      ctx.fillStyle = this.leftFade;
+      ctx.fillRect(view.left, view.top - 6, 32, view.innerH + 12);
+      ctx.fillStyle = this.rightFade;
+      ctx.fillRect(view.right - 32, view.top - 6, 32, view.innerH + 12);
+    }
+    ctx.restore();
+
+    ctx.globalCompositeOperation = "source-over";
+    drawPlayhead(ctx, view);
+
+    // Weather-like inertia: a time-based (not frame-based) exponential
+    // smoothing, so the same 6-second time constant holds regardless of
+    // actual frame rate. Suppressed during the prologue, whose own title
+    // card already covers this whole region.
+    if (!prologueActive) {
+      const nowMs = this.clockNow();
+      const dt = Math.max(0, Math.min(0.25, (nowMs - this.lastFrameNow) / 1000));
+      this.lastFrameNow = nowMs;
+      const targetDensity = score.voices.length > 0 ? voicesSounding / score.voices.length : 0;
+      const DENSITY_TIME_CONSTANT = 6.0;
+      this.densityEMA += (targetDensity - this.densityEMA) * (1 - Math.exp(-dt / DENSITY_TIME_CONSTANT));
+      drawBreathingVignette(ctx, view, this.densityEMA, THEME.isDark);
+    } else {
+      this.lastFrameNow = this.clockNow();
+    }
+
+    // The one surviving piece of on-plate typography: which colour is which
+    // voice. Hidden only during the prologue's own title card.
+    if (!prologueActive) drawPlateLegend(ctx, score, view);
+
+    if (prologueActive) {
+      ctx.globalAlpha = 1;
+      const frame = this.prologue.draw(ctx, score, view, this.clockNow());
+      if (frame.done) {
+        this.setStaticOpacity(1);
+        if (this.onPrologueEnd) this.onPrologueEnd();
+      }
+    }
+
+    drawMinimap(this.minimapCtx, score, this.analysis, this.minimapSize.width, this.minimapSize.height, t, this.rowOf);
+
+    if (this.capture) this.composite(view);
+
+    const now = performance.now();
+    this.frames++;
+    const stats = this.stats;
+    stats.drawn = drawn;
+    stats.sounding = sounding;
+    stats.thematicVoices = voicesSounding;
+    if (now - this.fpsAt >= 500) {
+      stats.fps = Math.round((this.frames * 1000) / (now - this.fpsAt));
+      this.frames = 0;
+      this.fpsAt = now;
+    }
+
+    if (this.onFrame) this.onFrame(t, stats);
+  }
+
+  /**
+   * Draws the live plate into the capture canvas.
+   *
+   * Landscape: crops to exactly the plate's own region (excluding the
+   * on-screen letterbox bars), using the exact translate values resize()
+   * applied to the live context, so the crop rectangle can never drift out
+   * of alignment with what was actually drawn.
+   *
+   * Shorts: NO crop math here at all -- resize()'s cover-fit already drew
+   * the correctly-framed 9:16 content directly onto the live canvases at
+   * their own native (narrow) resolution, via the transform, not via a
+   * post-hoc crop. Re-applying plate-region crop math on top of an already
+   * narrow source canvas would ask drawImage for a source rectangle far
+   * larger than the canvas actually contains. The live canvas IS the frame;
+   * export is a direct copy.
+   */
+  composite(view) {
+    const { canvas, ctx } = this.capture;
+    if (!ctx) return;
+    const h = canvas.height - MINIMAP_HEIGHT;
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.fillStyle = THEME.paperEdge;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    const fit = this.fit;
+    ctx.globalAlpha = this.staticOpacity < 0 ? 1 : this.staticOpacity;
+    if (this.aspectMode === "shorts") {
+      ctx.drawImage(this.staticCanvas, 0, 0, canvas.width, h);
+      ctx.globalAlpha = 1;
+      ctx.drawImage(this.dynamicCanvas, 0, 0, canvas.width, h);
+    } else if (fit && fit.scale && fit.deviceScale) {
+      const sx = fit.txDevice, sy = fit.tyDevice;
+      const sw = PLATE.width * fit.deviceScale, sh = PLATE.height * fit.deviceScale;
+      ctx.drawImage(this.staticCanvas, sx, sy, sw, sh, 0, 0, canvas.width, h);
+      ctx.globalAlpha = 1;
+      ctx.drawImage(this.dynamicCanvas, sx, sy, sw, sh, 0, 0, canvas.width, h);
+    } else {
+      // No fit computed yet (shouldn't happen once a score is loaded, but
+      // fail toward showing something rather than a blank frame).
+      ctx.drawImage(this.staticCanvas, 0, 0, canvas.width, h);
+      ctx.globalAlpha = 1;
+      ctx.drawImage(this.dynamicCanvas, 0, 0, canvas.width, h);
+    }
+    ctx.drawImage(this.minimapCanvas, 0, h, canvas.width, MINIMAP_HEIGHT);
+    ctx.restore();
+  }
+}
+
+/* ==========================================================================
+ * 15. EMBEDDED DEFAULT FIXTURE
+ * ========================================================================== */
+
+function defaultFixture() {
+  const PPQ = 480, S = PPQ / 4;
+  const SUBJ = [
+    [0, 2, 72], [2, 1, 71], [3, 1, 72], [4, 2, 67], [6, 2, 68],
+    [8, 2, 72], [10, 1, 71], [11, 1, 72], [12, 2, 67], [14, 2, 68],
+    [16, 1, 72], [17, 1, 70], [18, 1, 68], [19, 1, 70], [20, 1, 68], [21, 1, 67], [22, 1, 65], [23, 1, 67],
+    [24, 4, 68], [28, 2, 67], [30, 2, 65], [32, 8, 63]
+  ];
+  const ANSW = [
+    [0, 2, 67], [2, 1, 66], [3, 1, 67], [4, 2, 62], [6, 2, 63],
+    [8, 2, 67], [10, 1, 66], [11, 1, 67], [12, 2, 62], [14, 2, 63],
+    [16, 1, 67], [17, 1, 65], [18, 1, 63], [19, 1, 65], [20, 1, 63], [21, 1, 62], [22, 1, 60], [23, 1, 62],
+    [24, 4, 63], [28, 2, 62], [30, 2, 60], [32, 8, 58]
+  ];
+  const BASS_SUBJ = [
+    [0, 2, 48], [2, 1, 47], [3, 1, 48], [4, 2, 43], [6, 2, 44],
+    [8, 2, 48], [10, 1, 47], [11, 1, 48], [12, 2, 43], [14, 2, 44],
+    [16, 1, 48], [17, 1, 46], [18, 1, 44], [19, 1, 46], [20, 1, 44], [21, 1, 43], [22, 1, 41], [23, 1, 43],
+    [24, 4, 44], [28, 2, 43], [30, 2, 41], [32, 8, 36]
+  ];
+
+  const build = (phrase, start) => phrase.map(([off, dur, midi]) => ({
+    tick: start + off * S, durTick: dur * S, midi, vel: 0.85
+  }));
+
+  return buildScore({
+    name: "Fugue in C minor (Exposition)",
+    ppq: PPQ,
+    tempos: [{ tick: 0, usPerQuarter: 60000000 / 84 }],
+    timeSignatures: [{ tick: 0, numerator: 4, denominator: 4 }],
+    voices: [
+      { label: "Soprano", notes: build(SUBJ, 0) },
+      { label: "Alto", notes: build(ANSW, 18 * S) },
+      { label: "Bass", notes: build(BASS_SUBJ, 36 * S) },
+    ],
+  });
+}
+
+/* ==========================================================================
+ * 16. FULL QUALITY VIDEO EXPORT (Guaranteed Unmuted Audio Stream)
+ * ========================================================================== */
+
+const VIDEO_MIME = ["video/webm;codecs=vp9,opus", "video/webm;codecs=vp8,opus", "video/webm"];
+
+function pickMime() {
+  if (typeof MediaRecorder === "undefined") return null;
+  for (const m of VIDEO_MIME) {
+    try { if (MediaRecorder.isTypeSupported(m)) return m; } catch (e) {}
+  }
+  return null;
+}
+
+function videoExportSupported() {
+  return typeof MediaRecorder !== "undefined" &&
+    typeof HTMLCanvasElement !== "undefined" &&
+    typeof HTMLCanvasElement.prototype.captureStream === "function" &&
+    pickMime() !== null;
+}
+
+class VideoExport {
+  constructor(store, engine, renderer, session) {
+    this.store = store; this.engine = engine; this.renderer = renderer; this.session = session;
+    this.recorder = null; this.chunks = []; this.canvas = null;
+    this.active = false; this.aborted = false; this.starting = false;
+    this.onProgress = null;
+    this.onState = null;
+    this.wasMuted = false;
+    this.visibilityHandler = () => this.handleVisibility();
+  }
+
+  get progress() {
+    const score = this.store.get().score;
+    if (!score || !this.active) return 0;
+    return Math.max(0, Math.min(1, this.engine.scoreSeconds / score.durSec));
+  }
+
+  async start() {
+    // Reentrancy guard set SYNCHRONOUSLY, before the first await. The old
+    // code checked `this.active` but only set it true after `await
+    // this.engine.unlock()` resolved -- a second click (or a slow sample
+    // load) during that gap passed the same check and built a second,
+    // independent MediaRecorder that raced the first for the same canvas
+    // and audio stream. `this.starting` closes that window immediately.
+    if (this.active || this.starting) return;
+    this.starting = true;
+    try {
+      await this.startInner();
+    } finally {
+      this.starting = false;
+    }
+  }
+
+  async startInner() {
+    const score = this.store.get().score;
+    const monogram = this.session.monogram;
+    if (!score || !monogram) return;
+    const mime = pickMime();
+    if (!mime) { this.report("Video export is not supported in this browser."); return; }
+
+    const intendedInstrument = this.engine.instrumentId;
+    const intendedIsPiano = (INSTRUMENTS[intendedInstrument] || {}).kind === "sampler";
+
+    await this.engine.unlock();
+    if (this.active) return; // a concurrent call finished first while we awaited
+
+    // The hard guarantee, checked at the one point that actually matters:
+    // immediately before a single frame is recorded. Everything upstream
+    // (the disabled button, the eager preload) is there to make this check
+    // pass in the common case, but none of it is load-bearing by itself.
+    //
+    // Critical ordering: `intendedInstrument` is captured BEFORE unlock(),
+    // because unlock() can itself silently rewrite engine.instrumentId to
+    // "organ" as its own internal fallback when piano fails to load. Reading
+    // instrumentId only AFTER unlock() -- which an earlier version of this
+    // check did -- means the check always sees the ALREADY-substituted
+    // state and can never actually catch the failure: by the time it looks,
+    // the goalposts have already moved to organ, so "the current instrument
+    // is not piano" reads as fine even though the user's actual selection
+    // just got silently overridden underneath them.
+    if (intendedIsPiano && (this.engine.instrumentId !== intendedInstrument || !this.engine.pianoReady)) {
+      this.report("Cannot export: acoustic piano samples did not load, and video export will not substitute a synthesized fallback. Wait for loading to finish, or switch to a synthesized instrument to export that instead.");
+      return;
+    }
+
+    const stage = this.renderer.dynamicCanvas;
+    const fit = this.renderer.fit;
+    if (!fit || !fit.scale) {
+      this.report("Cannot export yet — the plate has not finished laying out.");
+      return;
+    }
+    // A clean target resolution derived explicitly from the selected aspect
+    // ratio -- never from the raw stage.clientWidth/clientHeight, which is
+    // whatever pixel size the browser happens to be rendering at and would
+    // bake in rounding fuzz or (in the old bug this replaced) an arbitrary
+    // window shape entirely. Landscape targets 16:9 from the display's own
+    // height; Shorts targets 9:16 from the display's own height the other
+    // way, with a higher floor (1280 vs 720) since vertical platforms are
+    // typically viewed at higher effective resolution on phone screens.
+    let targetW, targetH;
+    if (this.renderer.aspectMode === "shorts") {
+      targetH = Math.max(1280, Math.round(stage.clientHeight / 2) * 2);
+      targetW = Math.round((targetH * 9 / 16) / 2) * 2;
+    } else {
+      targetH = Math.max(720, Math.round(stage.clientHeight / 2) * 2);
+      targetW = Math.round((targetH * PLATE.width / PLATE.height) / 2) * 2;
+    }
+    this.canvas = document.createElement("canvas");
+    this.canvas.width = targetW;
+    this.canvas.height = targetH + MINIMAP_HEIGHT;
+    this.renderer.setCaptureTarget(this.canvas);
+
+    const stream = this.canvas.captureStream(60);
+    for (const track of this.engine.mediaStream().getAudioTracks()) stream.addTrack(track);
+
+    this.chunks.length = 0;
+    this.aborted = false;
+    this.recorder = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 14000000 });
+    this.recorder.ondataavailable = (e) => { if (e.data && e.data.size) this.chunks.push(e.data); };
+    this.recorder.onstop = () => this.finish(mime, monogram);
+    // A runtime failure mid-recording (a track ending, an encoder fault) used
+    // to leave the export "active" forever with no feedback and no cleanup.
+    this.recorder.onerror = (e) => {
+      console.error("[video export]", e);
+      this.report("Recording failed — see console.");
+      this.aborted = true;
+      this.cleanup();
+    };
+
+    this.wasMuted = this.engine.monitorMuted;
+    this.engine.setMonitor(false);
+    this.engine.seek(0);
+    this.active = true;
+    this.recorder.start(250);
+    this.engine.play();
+    this.store.set({ playing: true });
+    document.addEventListener("visibilitychange", this.visibilityHandler);
+    this.report(`Exporting Video — 0%`);
+    if (this.onState) this.onState(true);
+  }
+
+  handleVisibility() {
+    if (!this.active || !this.recorder) return;
+    if (document.hidden) {
+      if (this.recorder.state === "recording") this.recorder.pause();
+      this.engine.pause();
+      this.store.set({ playing: false });
+      this.report("Recording paused — tab hidden.");
+    } else {
+      if (this.recorder.state === "paused") this.recorder.resume();
+      this.engine.play();
+      this.store.set({ playing: true });
+    }
+  }
+
+  tick(t) {
+    if (!this.active) return;
+    const score = this.store.get().score;
+    if (!score) return;
+    this.report(`Exporting Video — ${Math.round(this.progress * 100)}%`);
+    if (t >= score.durSec) this.stop(false);
+  }
+
+  stop(aborted) {
+    if (!this.active) return;
+    this.aborted = !!aborted;
+    this.active = false;
+    document.removeEventListener("visibilitychange", this.visibilityHandler);
+    this.engine.pause();
+    this.store.set({ playing: false });
+    try { if (this.recorder && this.recorder.state !== "inactive") this.recorder.stop(); }
+    catch (err) { console.error(err); this.cleanup(); }
+  }
+
+  finish(mime, monogram) {
+    this.cleanup();
+    if (this.aborted) { this.report("Export aborted."); return; }
+    const blob = new Blob(this.chunks, { type: mime });
+    this.chunks.length = 0;
+    const name = slug(monogram.catalogue && monogram.catalogue !== "\u2014" ? monogram.catalogue : monogram.title);
+    downloadBlob(blob, `${name}.webm`);
+    this.report(`Exported ${name}.webm (${(blob.size / 1048576).toFixed(1)} MB)`);
+  }
+
+  cleanup() {
+    this.renderer.setCaptureTarget(null);
+    this.canvas = null;
+    this.recorder = null;
+    this.engine.setMonitor(!this.wasMuted);
+    if (this.onState) this.onState(false);
+  }
+
+  report(text) { if (this.onProgress) this.onProgress(text); }
+}
+
+/* ==========================================================================
+ * 17. SESSION
+ * ========================================================================== */
+
+class Session {
+  constructor(store, engine, renderer) {
+    this.store = store; this.engine = engine; this.renderer = renderer;
+    this.monogram = null;
+    this.frameZero = null;
+    this.frameZeroToken = 0;
+    this.onFrameZero = null;
+  }
+
+  invalidateFrameZero(score, monogram) {
+    this.frameZero = null;
+    const token = ++this.frameZeroToken;
+    renderFrameZero(score, monogram).then((canvas) => {
+      if (token !== this.frameZeroToken) return;
+      this.frameZero = canvas;
+      if (this.onFrameZero) this.onFrameZero(canvas);
+    }).catch((err) => {
+      console.error("[frame0]", err);
+      if (this.onFrameZero) this.onFrameZero(null, err);
+    });
+  }
+
+  reset() {
+    this.renderer.reset();
+    this.engine.teardown();
+    this.monogram = null;
+    this.frameZero = null;
+    this.frameZeroToken++;
+    this.store.set({ score: null, analysis: null, playing: false });
+  }
+
+  open(score, hints) {
+    this.reset();
+    const analysis = analyze(score);
+
+    this.engine.load(score);
+    this.engine.seek(0);
+    this.store.set({ score, analysis, playing: false });
+    this.engine.applyMix(() => true);
+    this.renderer.setScore(score, analysis);
+    this.monogram = buildMonogram(score, analysis, hints || {});
+
+    this.renderer.start();
+    this.renderer.beginPrologue(this.monogram);
+    this.invalidateFrameZero(score, this.monogram);
+
+    return analysis;
+  }
+
+  openBuffer(buffer, name, hints) {
+    const { score, diagnostics } = ingestMidi(buffer, { name });
+    const analysis = this.open(score, hints);
+    return Object.assign({}, diagnostics, { occurrences: analysis.occurrences.length });
+  }
+}
+
+/* ==========================================================================
+ * 18. UI CONTROLS & SELECTION DECK
+ * ========================================================================== */
+
+function clock(sec) {
+  const x = Math.max(0, Math.floor(sec));
+  return `${Math.floor(x / 60)}:${String(x % 60).padStart(2, "0")}`;
+}
+
+class Deck {
+  constructor(root, store, engine, renderer, session, video, hooks) {
+    this.store = store; this.engine = engine; this.renderer = renderer;
+    this.session = session; this.video = video; this.hooks = hooks;
+    this.lastLabel = ""; this.scrubbing = false; this.hideTimer = 0;
+
+    root.innerHTML =
+      '<button class="play" type="button" title="Space">Play</button>' +
+      '<div class="scrub" role="slider" tabindex="0" aria-label="Position"><div class="scrub-fill"></div></div>' +
+      '<span class="time">0:00 / 0:00</span>' +
+      '<div class="deck-sep"></div>' +
+
+      '<div class="deck-sep"></div>' +
+      '<select class="instrument-select" title="Instrument">' +
+        INSTRUMENT_UI_ORDER.map((id) => `<option value="${id}">${INSTRUMENTS[id].name}</option>`).join("") +
+      '</select>' +
+      '<div class="deck-sep"></div>' +
+      '<select class="tempo-select" title="Playback Speed">' +
+        '<option value="0.75">0.75x</option>' +
+        '<option value="0.9">0.9x</option>' +
+        '<option value="1.0" selected>1.0x</option>' +
+        '<option value="1.15">1.15x</option>' +
+        '<option value="1.3">1.3x</option>' +
+      '</select>' +
+      '<div class="deck-sep"></div>' +
+      '<select class="aspect-select" title="Aspect Ratio">' +
+        '<option value="landscape">Landscape (16:9)</option>' +
+        '<option value="shorts">Shorts (9:16)</option>' +
+      '</select>' +
+      '<div class="deck-sep"></div>' +
+      '<button class="video" type="button" title="Export Full HD Video with Audio">Export Video</button>' +
+      '<button class="thumb icon" type="button" title="Capture Thumbnail (PNG)" aria-label="Capture thumbnail">\u2b1a</button>' +
+      '<button class="mode icon" type="button" title="Switch Theme (T)" aria-label="Switch theme"></button>' +
+      '<button class="pick" type="button">Open MIDI</button>' +
+      '<input class="file" type="file" accept=".mid,.midi,audio/midi" hidden />';
+
+    this.el = {
+      play: root.querySelector(".play"),
+      time: root.querySelector(".time"),
+      track: root.querySelector(".scrub"),
+      fill: root.querySelector(".scrub-fill"),
+      mode: root.querySelector(".mode"),
+      instrumentSelect: root.querySelector(".instrument-select"),
+      tempoSelect: root.querySelector(".tempo-select"),
+      aspectSelect: root.querySelector(".aspect-select"),
+      video: root.querySelector(".video"),
+      thumb: root.querySelector(".thumb"),
+      file: root.querySelector(".file"),
+      status: document.getElementById("status"),
+    };
+
+    this.el.play.addEventListener("click", () => this.toggle());
+    this.el.mode.addEventListener("click", () => hooks.toggleTheme());
+    this.el.video.addEventListener("click", () => this.video.start());
+    this.el.thumb.addEventListener("click", () => this.captureThumbnail());
+    root.querySelector(".pick").addEventListener("click", () => this.el.file.click());
+
+    this.el.aspectSelect.value = renderer.aspectMode;
+    this.el.aspectSelect.addEventListener("change", (e) => {
+      renderer.setAspectMode(e.target.value);
+      renderer.console.push("ASPECT", e.target.value === "shorts" ? "9:16 Shorts" : "16:9 Landscape");
+    });
+
+    this.el.tempoSelect.addEventListener("change", (e) => {
+      const val = parseFloat(e.target.value);
+      engine.setTempo(val);
+      renderer.console.push("TEMPO", `${val.toFixed(2)}x`);
+    });
+
+    this.el.instrumentSelect.value = engine.instrumentId;
+    this.el.instrumentSelect.addEventListener("change", async (e) => {
+      const wanted = e.target.value;
+      this.el.instrumentSelect.disabled = true;
+      const wantsSamples = INSTRUMENTS[wanted] && INSTRUMENTS[wanted].kind === "sampler";
+      if (wantsSamples && !engine.pianoReady) this.setStatus("Loading piano samples\u2026");
+      const actual = await engine.setInstrument(wanted);
+      this.el.instrumentSelect.value = actual;
+      this.el.instrumentSelect.disabled = false;
+      if (actual !== wanted) {
+        this.setStatus("Piano samples unavailable \u2014 switched to Chamber Organ.");
+      } else if (wantsSamples) {
+        this.setStatus("");
+      }
+      renderer.console.push("VOICE", INSTRUMENTS[actual].name);
+      this.refreshExportGate();
+    });
+
+    this.el.file.addEventListener("change", () => {
+      const f = this.el.file.files && this.el.file.files[0];
+      if (f) this.loadFile(f);
+      this.el.file.value = "";
+    });
+
+    if (!videoExportSupported()) {
+      this.el.video.disabled = true;
+      this.el.video.title = "MediaRecorder unavailable.";
+    } else {
+      // Pre-export buffer lock: the button starts disabled if the current
+      // instrument needs samples that are not confirmed ready yet, and
+      // re-checks once the background load (kicked off eagerly at boot,
+      // see beginEagerPianoLoad) settles either way.
+      this.refreshExportGate();
+      engine.beginEagerPianoLoad().finally(() => this.refreshExportGate());
+    }
+
+    this.el.track.addEventListener("pointerdown", (e) => {
+      this.scrubbing = true;
+      this.el.track.setPointerCapture(e.pointerId);
+      this.seekFrom(e);
+    });
+    this.el.track.addEventListener("pointermove", (e) => { if (this.scrubbing) this.seekFrom(e); });
+    this.el.track.addEventListener("pointerup", (e) => {
+      this.scrubbing = false;
+      try { this.el.track.releasePointerCapture(e.pointerId); } catch (err) {}
+    });
+
+    store.subscribe((s, changed) => {
+      if (changed.has("playing")) {
+        this.el.play.textContent = s.playing ? "Pause" : "Play";
+        if (s.playing) this.armAutoHide(); else this.reveal(true);
+      }
+      if (changed.has("theme")) this.syncTheme(s.theme);
+    });
+
+    this.video.onProgress = (text) => this.setStatus(text, "");
+    this.video.onState = (recording) => {
+      if (this.renderer) this.renderer.console.push("EXPORT", recording ? "recording started" : "recording finished");
+      if (recording) { this.el.video.disabled = true; this.reveal(false); }
+      else this.refreshExportGate();
+    };
+
+    this.wireDropZone(document.body);
+    this.wireAutoHide();
+  }
+
+  /**
+   * The pre-export buffer lock. Piano-family voices (Concert Grand, Felt
+   * Upright) must have their real acoustic buffers confirmed decoded before
+   * export is allowed; every other voice needs nothing but "not already
+   * recording." Re-run on construction, whenever the eager background load
+   * settles, and whenever the instrument selection changes -- any of those
+   * can flip whether the gate applies at all.
+   */
+  refreshExportGate() {
+    if (!videoExportSupported()) return; // already permanently disabled
+    if (this.video.active) { this.el.video.disabled = true; return; }
+    const cfg = INSTRUMENTS[this.engine.instrumentId] || INSTRUMENTS[DEFAULT_INSTRUMENT];
+    if (cfg.kind !== "sampler" || this.engine.pianoReady) {
+      this.el.video.disabled = false;
+      this.el.video.title = "Export Full HD Video with Audio";
+      this.el.video.textContent = "Export Video";
+    } else if (this.engine.pianoUnavailable) {
+      this.el.video.disabled = true;
+      this.el.video.title = "Video export needs the acoustic piano, which failed to load on this connection. Reload to retry, or switch to a synthesized instrument.";
+      this.el.video.textContent = "Piano Unavailable";
+    } else {
+      this.el.video.disabled = true;
+      this.el.video.title = "Loading acoustic piano samples for export\u2026";
+      this.el.video.textContent = "Loading Piano\u2026";
+    }
+  }
+
+  /**
+   * Captures the CURRENT frame -- whatever is actually on screen at the
+   * instant of the click, mid-performance included -- as a high-resolution
+   * PNG, with the work's title stamped in the same classical serif used
+   * throughout the piece. Deliberately distinct from the frame-0 monogram
+   * export (renderFrameZero/exportThumbnail): that one is a fixed opening
+   * title card meant to represent the whole video as a YouTube thumbnail;
+   * this one is a live snapshot of one particular passage, the way a
+   * viewer might grab a still to point at a specific moment in the piece.
+   */
+  async captureThumbnail() {
+    const view = this.renderer.getView();
+    const fit = this.renderer.fit;
+    if (!view || !fit || !fit.scale) return;
+
+    const targetW = 1920;
+    const targetH = this.renderer.aspectMode === "shorts"
+      ? Math.round(targetW * 16 / 9)
+      : Math.round(targetW * PLATE.height / PLATE.width);
+    const canvas = document.createElement("canvas");
+    canvas.width = targetW; canvas.height = targetH;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    if (this.renderer.aspectMode === "shorts") {
+      ctx.drawImage(this.renderer.staticCanvas, 0, 0, targetW, targetH);
+      ctx.drawImage(this.renderer.dynamicCanvas, 0, 0, targetW, targetH);
+    } else {
+      const sx = fit.txDevice, sy = fit.tyDevice;
+      const sw = PLATE.width * fit.deviceScale, sh = PLATE.height * fit.deviceScale;
+      ctx.drawImage(this.renderer.staticCanvas, sx, sy, sw, sh, 0, 0, targetW, targetH);
+      ctx.drawImage(this.renderer.dynamicCanvas, sx, sy, sw, sh, 0, 0, targetW, targetH);
+    }
+
+    const m = this.session.monogram;
+    if (m) {
+      if (document.fonts && document.fonts.ready) { try { await document.fonts.ready; } catch (e) {} }
+      const pad = targetH * 0.045;
+      const titleSize = targetH * 0.034;
+      ctx.save();
+      ctx.font = `italic ${titleSize}px ${DISPLAY_STACK}`;
+      ctx.textAlign = "left";
+      ctx.textBaseline = "alphabetic";
+      const label = m.title + (m.catalogue && m.catalogue !== "\u2014" ? "  \u00B7  " + m.catalogue : "");
+      const tw = ctx.measureText(label).width;
+      // A quiet plate-mark frame behind the stamp, exactly the same bevel
+      // convention as every note and the opening title card -- not a solid
+      // box, which would look like a caption bar pasted on top.
+      ctx.fillStyle = "rgba(244, 238, 221, 0.82)";
+      ctx.fillRect(pad - titleSize * 0.5, targetH - pad - titleSize * 1.5, tw + titleSize, titleSize * 2.1);
+      ctx.fillStyle = "rgba(36, 33, 29, 0.92)";
+      ctx.fillText(label, pad, targetH - pad - titleSize * 0.35);
+      ctx.restore();
+    }
+
+    try {
+      const blob = await canvasToBlob(canvas);
+      downloadBlob(blob, slug(m ? m.title : "counterpoint") + "-thumbnail.png");
+    } catch (err) {
+      console.error("[thumbnail]", err);
+      this.setStatus("Could not capture thumbnail.");
+    }
+  }
+
+  syncTheme(id) {
+    const isDark = id === "obsidian";
+    this.el.mode.textContent = isDark ? "\u2600" : "\u25D0";
+    this.el.mode.title = isDark ? "Switch to Archival Vellum (T)" : "Switch to Japanese Sumi (T)";
+  }
+
+  async toggle() {
+    const wasReady = this.engine.ready;
+    if (!wasReady && this.engine.instrumentId === "piano") {
+      this.el.play.disabled = true;
+      this.setStatus("Loading piano samples\u2026");
+    }
+    await this.engine.unlock();
+    if (!wasReady) {
+      this.el.play.disabled = false;
+      if (this.engine.pianoUnavailable && this.engine.instrumentId !== "piano") {
+        this.setStatus("Piano samples unavailable \u2014 playing Chamber Organ instead.");
+        this.el.instrumentSelect.value = "organ";
+      } else {
+        this.setStatus("");
+      }
+    }
+    const playing = !this.store.get().playing;
+    if (playing) this.engine.play(); else this.engine.pause();
+    this.store.set({ playing });
+  }
+
+  seekFrom(e) {
+    const score = this.store.get().score;
+    const rect = this.el.track.getBoundingClientRect();
+    this.engine.seek(Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width)) * (score ? score.durSec : 0));
+  }
+
+  update(t) {
+    const score = this.store.get().score;
+    const dur = score ? score.durSec : 0;
+    this.el.fill.style.transform = `scaleX(${dur > 0 ? Math.min(1, t / dur) : 0})`;
+    const label = `${clock(t)} / ${clock(dur)}`;
+    if (label !== this.lastLabel) { this.el.time.textContent = label; this.lastLabel = label; }
+  }
+
+  wireAutoHide() {
+    const wake = () => { this.reveal(true); if (this.store.get().playing) this.armAutoHide(); };
+    window.addEventListener("pointermove", wake, { passive: true });
+    window.addEventListener("pointerdown", wake, { passive: true });
+  }
+
+  armAutoHide() {
+    clearTimeout(this.hideTimer);
+    this.hideTimer = setTimeout(() => {
+      if (this.store.get().playing && !this.scrubbing) document.body.classList.add("deck-hidden");
+    }, 2500);
+  }
+
+  reveal(allowReturn) {
+    clearTimeout(this.hideTimer);
+    if (this.video.active && !allowReturn) { document.body.classList.add("deck-hidden"); return; }
+    if (this.video.active) return;
+    document.body.classList.remove("deck-hidden");
+  }
+
+  wireDropZone(target) {
+    let depth = 0;
+    target.addEventListener("dragenter", (e) => { e.preventDefault(); if (++depth === 1) target.classList.add("dropping"); });
+    target.addEventListener("dragover", (e) => { e.preventDefault(); if (e.dataTransfer) e.dataTransfer.dropEffect = "copy"; });
+    target.addEventListener("dragleave", () => { if (--depth <= 0) { depth = 0; target.classList.remove("dropping"); } });
+    target.addEventListener("drop", (e) => {
+      e.preventDefault(); depth = 0; target.classList.remove("dropping");
+      const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+      if (f) this.loadFile(f);
+    });
+  }
+
+  readLocalFile(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        if (reader.result instanceof ArrayBuffer) resolve(reader.result);
+        else reject(new Error("Could not read binary data."));
+      };
+      reader.onerror = () => reject(reader.error || new Error("Could not read file."));
+      reader.readAsArrayBuffer(file);
+    });
+  }
+
+  async loadFile(file) {
+    if (this.busy) return;
+    this.busy = true;
+    if (this.video.active) this.video.stop(true);
+    this.setStatus(`Loading ${file.name}\u2026`, "");
+    try {
+      const buffer = await this.readLocalFile(file);
+      const d = this.session.openBuffer(buffer, file.name, {});
+      const shape = d.singleLayer ? "1 voice, single layer" : `${d.voiceCount} voices / ${d.voicedTrackCount} tracks`;
+      this.setStatus(`${file.name} \u2014 Type ${d.format}, ${shape}, ${d.noteCount} notes`, "ok");
+      this.renderer.console.push("FILE", `${file.name} \u2014 SMF type ${d.format}`);
+    } catch (err) {
+      this.session.reset();
+      this.setStatus(err && err.message ? err.message : "Unreadable file.", "error");
+      this.renderer.console.push("ERROR", err && err.message ? err.message.slice(0, 46) : "unreadable file");
+    } finally { this.busy = false; }
+  }
+
+  setStatus(text, kind) {
+    this.el.status.textContent = text;
+    this.el.status.className = "autohide " + (kind || "");
+  }
+}
+
+/* ==========================================================================
+ * 19. BOOT & THEME SWITCHING
+ * ========================================================================== */
+
+function applyTheme(id, store, renderer, session) {
+  const theme = THEMES.find((t) => t.id === id) || THEMES[0];
+  activeTheme = theme;
+  THEME = environmentFor(theme);
+
+  const root = document.documentElement;
+  if (theme.isDark) root.setAttribute("data-theme", "obsidian");
+  else root.removeAttribute("data-theme");
+
+  root.style.setProperty("--paper", theme.paper);
+  root.style.setProperty("--paper-edge", theme.paperEdge);
+  root.style.setProperty("--ink", theme.ink);
+
+  const score = store.get().score;
+  if (score) {
+    applyVoicePalettes(score, theme);
+    renderer.paper = null;
+    renderer.staticDirty = true;
+    if (session.monogram) session.invalidateFrameZero(score, session.monogram);
+  }
+  store.set({ theme: theme.id });
+}
+
+function boot() {
+  if (typeof Tone === "undefined") {
+    const fatal = document.getElementById("fatal");
+    fatal.style.display = "grid";
+    fatal.textContent = "Tone.js could not be loaded. Please check network connectivity.";
+    return;
+  }
+
+  const stage = document.getElementById("stage");
+  const store = new Store();
+  const engine = new AudioEngine();
+
+  const renderer = new Renderer(
+    document.getElementById("layer-static"),
+    document.getElementById("layer-dynamic"),
+    document.getElementById("layer-minimap"),
+    store, engine,
+  );
+  const session = new Session(store, engine, renderer);
+  const video = new VideoExport(store, engine, renderer, session);
+
+  const deck = new Deck(document.getElementById("deck-controls"), store, engine, renderer, session, video, {
+    toggleTheme: () => {
+      const next = store.get().theme === "vellum" ? "obsidian" : "vellum";
+      applyTheme(next, store, renderer, session);
+      renderer.console.push("THEME", next);
+    },
+  });
+
+  // The DOM debug log, metadata panel, and FPS meter are gone per the "no
+  // diagnostics console" brief -- the score should read as an artwork, not
+  // a control panel. renderer.console is already a safe permanent no-op
+  // (see Renderer's constructor), so nothing here needs to feed it.
+  const macro = document.getElementById("deck-macro");
+
+  session.onFrameZero = (canvas, err) => {
+    if (canvas) console.info(`[frame0] ready ${canvas.width}x${canvas.height}`);
+  };
+
+  renderer.onFrame = (t, stats) => {
+    deck.update(t);
+    video.tick(t);
+    const score = store.get().score;
+    if (score && store.get().playing && t >= score.durSec && !video.active) {
+      engine.pause();
+      store.set({ playing: false });
+    }
+  };
+
+  renderer.onPrologueEnd = async () => {
+    if (Tone.context.state === "running") {
+      if (!store.get().playing) void deck.toggle();
+    } else {
+      deck.setStatus("Click anywhere or press Space to play", "");
+    }
+  };
+
+  stage.addEventListener("pointerdown", async (e) => {
+    if (renderer.prologue.active) { renderer.skipPrologue(); }
+    await engine.unlock();
+    const view = renderer.getView();
+    const fit = renderer.fit;
+    if (!view || !fit || !fit.scale) return;
+    const rect = stage.getBoundingClientRect();
+    const plateX = (e.clientX - rect.left - fit.offsetX) / fit.scale;
+    engine.seek(secOfX(view, plateX, engine.scoreSeconds));
+    if (!store.get().playing) void deck.toggle();
+  });
+
+  macro.addEventListener("pointerdown", async (e) => {
+    await engine.unlock();
+    const score = store.get().score;
+    const rect = macro.getBoundingClientRect();
+    engine.seek(((e.clientX - rect.left) / rect.width) * (score ? score.durSec : 0));
+  });
+
+  window.addEventListener("keydown", async (e) => {
+    if (e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement) return;
+    if (e.key === " " || e.key === "ArrowLeft" || e.key === "ArrowRight") {
+      await engine.unlock();
+    }
+    switch (e.key) {
+      case " ":
+        e.preventDefault();
+        if (renderer.prologue.active) renderer.skipPrologue(); else deck.toggle();
+        break;
+      case "ArrowLeft": engine.seek(engine.scoreSeconds - 5); break;
+      case "ArrowRight": engine.seek(engine.scoreSeconds + 5); break;
+      case "Home": case "r": case "R": engine.seek(0); break;
+      case "m": case "M": {
+        const on = engine.toggleMonitor();
+        deck.setStatus(on ? "Audio on" : "Audio muted", "");
+        break;
+      }
+      case "p": case "P": store.set({ presentation: !store.get().presentation }); break;
+      case "t": case "T": {
+        const next = store.get().theme === "vellum" ? "obsidian" : "vellum";
+        applyTheme(next, store, renderer, session);
+        break;
+      }
+      case "g": case "G":
+        renderer.showRules = !renderer.showRules;
+        renderer.staticDirty = true;
+        renderer.console.push("PLATE", renderer.showRules ? "rules on" : "rules off");
+        break;
+    }
+  });
+
+  store.subscribe((s, changed) => {
+    if (changed.has("presentation")) {
+      document.body.classList.toggle("presenting", s.presentation);
+      requestAnimationFrame(() => renderer.resize());
+    }
+  });
+
+  const observer = new ResizeObserver(() => renderer.resize());
+  observer.observe(stage);
+  observer.observe(macro);
+
+  window.addEventListener("error", (e) => {
+    renderer.console.push("ERROR", String((e && e.message) || "unknown").slice(0, 46));
+  });
+  window.addEventListener("unhandledrejection", (e) => {
+    const r = e && e.reason;
+    renderer.console.push("ERROR", String((r && r.message) || r || "rejected").slice(0, 46));
+  });
+
+  window.addEventListener("beforeunload", () => { renderer.stop(); engine.dispose(); });
+
+  applyTheme(DEFAULT_THEME, store, renderer, session);
+  deck.syncTheme(DEFAULT_THEME);
+  session.open(defaultFixture(), { title: "Fugue in C minor (Exposition)", catalogue: "BWV 847" });
+
+  window.Counterpoint = {
+    store, engine, renderer, session, video, deck,
+    analyze, estimateKey, buildScore, ingestMidi, validateScore,
+    buildMonogram, drawMonogram, layoutView, xOfSec, yOfMidi,
+    THEMES, applyTheme: (id) => applyTheme(id, store, renderer, session),
+  };
+}
+
+if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot);
+else boot();
+</script>
+</body>
+</html>
