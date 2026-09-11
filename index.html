@@ -4,14 +4,16 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Counterpoint — Archival Plate</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600;1,700&display=swap">
 <style>
 :root {
-  --paper: #F4EEDD;
-  --paper-edge: #EDE6D8;
-  --ink: #24211D;
+  --paper: #FAF7EE;
+  --paper-edge: #F2EBDC;
+  --ink: #2A2421;
   --lead: 1.55;
   --gap: 6px;
-  --serif: "EB Garamond","Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+  --serif: 'Cormorant Garamond', serif;
   --mono: ui-monospace,"SF Mono","Geist Mono","Courier New",monospace;
   color-scheme: light;
 }
@@ -212,24 +214,30 @@ const THEMES = [
     // paperDark is no longer used by the algorithm (kept defined so nothing
     // elsewhere that reads the theme object breaks) and paperEdge remains
     // the vignette-only tone, confined strictly to the outer margin.
-    paper: "#F4EEDD",      // warm antique vellum -- the sheet's one true tone
-    paperMid: "#EDE5D2",   // a whisper of secondary tint, applied uniformly
-    paperDark: "#E5D7BC",
-    paperEdge: "#D8C7A4",  // perimeter patina -- outer 20% only
-    ink: "#24211D",
-    rulerOctave: "rgba(145, 135, 120, 0.18)",
+    paper: "#FAF7EE",      // luminous ivory -- the sheet's one true tone
+    paperMid: "#F3EEE3",   // a whisper of secondary tint, applied uniformly
+    paperDark: "#EBE0CD",
+    paperEdge: "#F2EBDC",  // perimeter patina -- outer 20% only, kept close to paper for a luminous, unaged edge
+    ink: "#2A2421",
+    // Whisper-quiet: 8% opacity, and (see drawPaper) confined to true
+    // octave (C-note) lines within C1-C6 only -- no other background
+    // pitch-guide clutter of any kind survives.
+    rulerOctave: "rgba(145, 135, 120, 0.08)",
     rulerBarMajor: "rgba(145, 135, 120, 0.18)",
     rulerBarTick: "rgba(145, 135, 120, 0.28)",
     rulerNumber: "rgba(145, 135, 120, 0.42)",
     isDark: false,
-    // Four historical pigments, not a chart palette: madder/terracotta, oxidized
-    // verdigris, dyer's indigo, and iron-gall bistre. Each is a real ink or
-    // pigment a Baroque copyist could have had on the desk. They are also
-    // chosen to sit far apart in BOTH hue and lightness -- bistre reads as
-    // near-black, indigo is the only blue, verdigris the only green, terracotta
-    // the only warm red -- so the four stay instantly distinguishable even
-    // before a viewer has learned the register convention.
-    voices: ["#A6572E", "#3F7A3A", "#2B3D72", "#2A2420", "#6B3B5A", "#8C6A1E"],
+    // Four DEEPENED mineral pigments, not a chart palette: the exact desk a
+    // Baroque copyist would have had, pushed to a richer, more authoritative
+    // presence than a pastel sketch -- madder terracotta, oxidized
+    // verdigris, dyer's indigo, and walnut iron-gall, each a real historical
+    // ink or pigment. They are also chosen to sit far apart in BOTH hue and
+    // lightness -- iron-gall reads as near-black, indigo is the only blue,
+    // verdigris the only green, terracotta the only warm red -- so the four
+    // stay instantly distinguishable even before a viewer has learned the
+    // register convention. Quintus/Sextus (rare 5th/6th voices) keep their
+    // own separate identities beyond the four.
+    voices: ["#A84825", "#2E724D", "#2B4278", "#261E1A", "#6B3B5A", "#8C6A1E"],
   },
   {
     id: "obsidian",
@@ -241,7 +249,7 @@ const THEMES = [
     paperDark: "#0E0F11",
     paperEdge: "#0B0C0D",
     ink: "#E6E2D8",
-    rulerOctave: "rgba(90, 94, 104, 0.20)",
+    rulerOctave: "rgba(90, 94, 104, 0.08)",
     rulerBarMajor: "rgba(90, 94, 104, 0.18)",
     rulerBarTick: "rgba(90, 94, 104, 0.28)",
     rulerNumber: "rgba(150, 154, 164, 0.45)",
@@ -361,10 +369,19 @@ function environmentFor(theme) {
  *
  * So: the body is one dominant tone with a single, spatially UNIFORM tint
  * mixed in at a fixed ratio (never a noise field choosing how much), plus a
- * sub-pixel analog tooth (+-2.5 RGB) that gives it surface without ever
+ * sub-pixel analog tooth (+-7.5 RGB) that gives it a palpable, matte pulp
+ * surface -- tangible rather than a flat digital fill -- without ever
  * suggesting a shape underneath. The vignette is confined strictly to the
  * outer 20% of the sheet, so the aged edge reads as a frame around a flat
- * page rather than a gradient wash across the whole thing.
+ * page rather than a gradient wash across the whole thing. No trigonometric
+ * cloud terms of any kind remain in this function -- every variation below
+ * comes from the seeded linear PRNG, never a sine/cosine field.
+ *
+ * The sheet is left otherwise unmarked: no foxing, no age-spotting, no
+ * rust-wash blemishes of any kind -- a master edition belongs on pristine,
+ * clean cotton rag, not a stained or foxed page. The only surviving texture
+ * is the sub-pixel pulp tooth above and the sparse embedded rag fibers
+ * below, both genuinely tactile rather than a mark of age or damage.
  */
 function makePaper(w, h) {
   const cw = Math.max(1, Math.ceil(w));
@@ -403,8 +420,9 @@ function makePaper(w, h) {
 
       // Sub-pixel analog tooth: the ONLY spatial variation in the sheet
       // itself. Three averaged samples keep it a soft grain rather than
-      // salt-and-pepper noise, at a fraction of the old amplitude.
-      const tooth = ((rnd() + rnd() + rnd()) / 3 - 0.5) * 5.0;
+      // salt-and-pepper noise, tuned for a palpable, matte pulp feel --
+      // a tactile +-7.5 RGB swing rather than a flat digital fill.
+      const tooth = ((rnd() + rnd() + rnd()) / 3 - 0.5) * 15.0;
 
       const distFrac = Math.hypot(x - cx, y - cy) / maxR;
       const k = smoothstep01((distFrac - VIGNETTE_START) / (1 - VIGNETTE_START)) * 0.42;
@@ -417,31 +435,10 @@ function makePaper(w, h) {
   }
   g.putImageData(img, 0, 0);
 
-  // Foxing: three to six soft warm spots, sized like real age-spotting, never
-  // more saturated than a faint rust wash. Skipped on the dark stock -- sumi
-  // ink stone does not fox.
-  if (!THEME.isDark) {
-    g.save();
-    const foxCount = 3 + Math.floor(rnd() * 4);
-    for (let f = 0; f < foxCount; f++) {
-      const fx = rnd() * cw, fy = rnd() * ch;
-      const fr = 14 + rnd() * 30;
-      const grad = g.createRadialGradient(fx, fy, 0, fx, fy, fr);
-      grad.addColorStop(0, `rgba(150, 108, 62, ${0.05 + rnd() * 0.035})`);
-      grad.addColorStop(1, "rgba(150, 108, 62, 0)");
-      g.fillStyle = grad;
-      g.beginPath();
-      g.arc(fx, fy, fr, 0, Math.PI * 2);
-      g.fill();
-    }
-    g.restore();
-  }
-
-  // Rag fibers: whisper-quiet and genuinely fine -- 0.35px lines, sparse
-  // (one fibre per ~12000 sq. px rather than the old ~6200), at 7% opacity
-  // on the light stock. This is meant to feel embedded in the pulp, not
-  // scattered on top of it; if you can count individual fibres at a glance,
-  // it is too strong.
+  // Rag fibers: sparse and genuinely embedded -- 0.35px lines, one per
+  // ~12000 sq. px, at ~7% opacity on the light stock. This is meant to feel
+  // woven into the pulp itself, not scattered on top of it; if you can
+  // count individual fibres at a glance, it is too strong.
   g.save();
   g.lineWidth = 0.35;
   g.lineCap = "round";
@@ -452,7 +449,7 @@ function makePaper(w, h) {
     const flen = 6 + rnd() * 13;
     const fAngle = rnd() * Math.PI * 2;
     const fCurve = (rnd() - 0.5) * 6;
-    const fOpacity = THEME.isDark ? (0.05 + rnd() * 0.03) : (0.055 + rnd() * 0.03);
+    const fOpacity = THEME.isDark ? (0.045 + rnd() * 0.025) : (0.055 + rnd() * 0.03);
 
     g.strokeStyle = THEME.isDark
       ? `rgba(230, 226, 216, ${fOpacity.toFixed(3)})`
@@ -685,6 +682,35 @@ function medianPitch(notes) {
   return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
 }
 
+/**
+ * Pure contrapuntal voice naming: a track's own embedded MIDI name is only
+ * trusted when it actually reads as a voice name. DAW export slots ("Track
+ * 3", "Channel 2") and organ registration stops ("Org.1", "Ped Stop-C") are
+ * neither -- they are the instrument's or the sequencer's own bookkeeping,
+ * never a name a copyist would have written on a part. Anything matching
+ * this is discarded in favour of the classic contrapuntal names, assigned
+ * top to bottom by pitch once the voices are already ordered by median
+ * register (see ingestMidi).
+ */
+const TECHNICAL_LABEL_RE = /\b(org(an)?\.?\s*#?\d*|ped(al)?\.?\s*(stop)?[\s-]*[a-z0-9]*|stop[\s-]*[a-z0-9]*|track\s*#?\d*|channel\s*#?\d*|midi\s*#?\d*|instrument\s*#?\d*|patch\s*#?\d*|part\s*#?\d+|untitled)\b/i;
+
+function isTechnicalLabel(name) {
+  const s = String(name || "").trim();
+  if (!s) return true;
+  if (TECHNICAL_LABEL_RE.test(s)) return true;
+  // A bare short code plus a number ("Trk1", "Ch2", "Vc.3") reads as an
+  // instrument-patch or DAW track slot, not a voice a copyist ever wrote.
+  return /^[A-Za-z]{1,5}\.?\s*#?\d+$/.test(s);
+}
+
+// The organ-and-pedal-aware five-name set. Used whenever any track's own
+// label reads as technical (a strong signal this file came off an organ
+// console or a DAW export rather than a hand-labelled score) -- "Pedal"
+// rather than "Quintus" for a real fifth voice at the bottom of an organ
+// texture.
+const CONTRAPUNTAL_NAMES = ["Soprano", "Alto", "Tenor", "Bass", "Pedal"];
+const contrapuntalLabel = (i) => CONTRAPUNTAL_NAMES[i] || `Voice ${i + 1}`;
+
 function ingestMidi(buffer, opts) {
   opts = opts || {};
   let smf;
@@ -728,10 +754,25 @@ function ingestMidi(buffer, opts) {
     .sort((a, b) => b.med - a.med)
     .map((x) => x.t);
 
-  const voices = ordered.map((track, i) => ({
-    label: (opts.labels && opts.labels[i]) || track.name || (singleLayer ? "All voices" : labelForIndex(i)),
-    notes: track.notes.map((n) => ({ tick: n.tick, durTick: n.durTick, midi: n.midi, vel: n.vel })),
-  }));
+  // A piece-wide signal, not a per-track one: if ANY track's own name reads
+  // as technical, the whole file most likely came from an organ console or
+  // a DAW rather than a hand-labelled score, so every voice that needs a
+  // fallback name uses the same naming convention rather than mixing
+  // "Soprano" with "Quintus" depending on which particular track happened
+  // to carry a clean name.
+  const anyTechnical = ordered.some((t) => t.name && isTechnicalLabel(t.name));
+
+  const voices = ordered.map((track, i) => {
+    const supplied = opts.labels && opts.labels[i];
+    const usable = track.name && !isTechnicalLabel(track.name) ? track.name : null;
+    const fallback = singleLayer
+      ? "All voices"
+      : (anyTechnical ? contrapuntalLabel(i) : labelForIndex(i));
+    return {
+      label: supplied || usable || fallback,
+      notes: track.notes.map((n) => ({ tick: n.tick, durTick: n.durTick, midi: n.midi, vel: n.vel })),
+    };
+  });
 
   const score = buildScore({
     name: opts.name || "Untitled",
@@ -1123,21 +1164,111 @@ function median(xs) {
 
 function extractCatalogue(name) {
   const s = String(name || "");
-  const mBwv = /\bBWV[\s_-]*(\d+[a-z]?)\b/i.exec(s);
+  const mBwv = /\bBWV\.?[\s_-]*(\d+[a-z]?)\b/i.exec(s);
   if (mBwv) return `BWV ${mBwv[1]}`;
   const mNum = /\b(988|84[6-9]|8[5-9]\d|10\d{2}|[1-9]\d{2})\b/i.exec(s);
   if (mNum) return `BWV ${mNum[1]}`;
   return null;
 }
 
+/**
+ * Known nicknames for named Bach works, keyed by the bare word a filename
+ * tends to carry (lowercased, whitespace-normalised) and mapped to the
+ * form a real programme note would use. Anything not in this small list
+ * still gets a nickname -- just title-cased as written rather than
+ * expanded with "The" -- so an unrecognised name is never dropped, only
+ * left unembellished.
+ */
+const WORK_NICKNAMES = {
+  great: "The Great", little: "The Little", giant: "The Giant",
+  wedge: "The Wedge", dorian: "The Dorian", cathedral: "The Cathedral",
+  jig: "The Jig Fugue", "st anne": "St Anne", stanne: "St Anne",
+  "wachet auf": "Wachet auf", easter: "The Easter",
+};
+
+/**
+ * A nickname is set off from the rest of a filename the way a copyist sets
+ * one off in prose: in parentheses, or -- the common raw-export equivalent
+ * -- behind a run of two or more underscores, trailing to the end of the
+ * name. Either form is pulled out here, BEFORE the generic slug cleanup
+ * below runs, so it never gets swallowed as just another underscore-word
+ * and lost.
+ */
+function extractNickname(raw) {
+  let s = String(raw || "");
+  let nickname = null;
+  const paren = /\(([^)]+)\)/.exec(s);
+  if (paren) {
+    nickname = paren[1].trim();
+    s = s.slice(0, paren.index) + s.slice(paren.index + paren[0].length);
+  } else {
+    const under = /_{2,}([A-Za-z][A-Za-z'\- ]*?)_*$/.exec(s);
+    if (under) {
+      nickname = under[1].trim();
+      s = s.slice(0, under.index) + s.slice(under.index + under[0].length);
+    }
+  }
+  if (nickname) {
+    const key = nickname.toLowerCase().replace(/\s+/g, " ").trim();
+    nickname = WORK_NICKNAMES[key] || (nickname[0].toUpperCase() + nickname.slice(1).toLowerCase());
+  }
+  return { rest: s, nickname };
+}
+
+// Small connecting words stay lowercase mid-title -- "Fugue in C minor," not
+// "Fugue In C Minor."
+const TITLE_MINOR_WORDS = new Set(["a", "an", "and", "as", "at", "but", "by", "for", "in", "nor", "of", "on", "or", "the", "to", "v", "via"]);
+
+function titleCaseWork(s) {
+  const words = s.split(" ").filter(Boolean);
+  return words.map((w, i) => {
+    const lw = w.toLowerCase();
+    if (i > 0 && i < words.length - 1 && TITLE_MINOR_WORDS.has(lw)) return lw;
+    return w[0].toUpperCase() + w.slice(1).toLowerCase();
+  }).join(" ");
+}
+
+/**
+ * Fully automatic title formatting -- zero manual cleanup ever required.
+ * A raw export like "Johann_Sebastian_Bach_-_Fugue_BWV_542__Great_.mid" is
+ * walked through, in order: extension stripped, any nickname pulled out
+ * and set aside (see extractNickname), the composer's name discarded in
+ * every common form ("Johann Sebastian Bach", "J.S. Bach", bare "Bach"),
+ * the catalogue number discarded (extractCatalogue reads it separately, so
+ * losing it here costs nothing), underscores and dashes collapsed to
+ * spaces, and what remains gently title-cased. A bare "fugue18"-style slug
+ * is rebuilt into a properly punctuated ordinal ("Fugue No. 18") rather
+ * than ever printed raw. The result is never a filename fragment, a track
+ * count, or a ".mid" extension -- only a title a copyist could have
+ * written by hand, in dignified Title Case, never screaming capitals.
+ */
 function cleanTitle(name) {
-  return (name || "")
-    .replace(/\.(mid|midi)$/i, "")
+  const raw = String(name || "").replace(/\.(mid|midi)$/i, "");
+  const { rest, nickname } = extractNickname(raw);
+
+  let s = rest
     .replace(/[_-]+/g, " ")
-    .replace(/\s*\bBWV\s*\d+[a-z]?\b\s*/i, " ")
-    .replace(/\b988\b/i, "")
+    .replace(/\bJohann\s+Sebastian\s+Bach\b/gi, " ")
+    .replace(/\bJ\.?\s*S\.?\s*Bach\b/gi, " ")
+    .replace(/\bBach\b/gi, " ")
+    .replace(/\s*\bBWV\.?\s*\d+[a-z]?\b\s*/gi, " ")
+    .replace(/\b988\b/g, " ")
     .replace(/\s{2,}/g, " ")
-    .trim() || "Untitled";
+    .trim();
+
+  if (!s) {
+    s = "Untitled";
+  } else {
+    const mSlug = /^(fugue|prelude|invention|sinfonia|aria|gigue|allemande|courante|sarabande|minuet|canon|toccata|fantasia|chorale)\s*(\d+)$/i.exec(s);
+    if (mSlug) {
+      const word = mSlug[1][0].toUpperCase() + mSlug[1].slice(1).toLowerCase();
+      s = `${word} No. ${mSlug[2]}`;
+    } else {
+      s = titleCaseWork(s);
+    }
+  }
+
+  return nickname ? `${s} ('${nickname}')` : s;
 }
 
 function buildMonogram(score, analysis, hints) {
@@ -1218,37 +1349,70 @@ function platePlayheadX(playheadRatio) {
   return marginX + Math.round(innerW * (playheadRatio == null ? 0.381966 : playheadRatio));
 }
 
+/**
+ * Immersive framing, with one hard priority above it: substantial note
+ * mass. Margins are cut to ~6-8% of the plate so the musical lines fill the
+ * frame with real presence -- an intimate illuminated page, not a plate
+ * mounted behind glass -- and a bottom-heavier-than-top ratio (1.35x) keeps
+ * an optical-mount asymmetry. But a wide-compass score (BWV 542-style,
+ * 5+ octaves) can shrink `innerH / span` well under the height a single
+ * 15.2px slug plus its own lane gap actually needs; when that happens, the
+ * row grid grows to that floor INSTEAD of continuing to compress notes into
+ * fragile ribbons, and the musical field expands symmetrically past the
+ * nominal margins to make room, right up to a hard, always-respected
+ * clearance (`HARD_PAD_TOP`/`HARD_PAD_BOTTOM` -- enough room for the voice
+ * legend and bar numbers above, a sliver of paper below). Ordinary 2-3
+ * octave pieces never trigger this at all: `innerH / span` already clears
+ * the floor, so rowH/top/bottom come out identical to the un-recalibrated
+ * version. For the rare score wide enough that even the hard clearance
+ * cannot fit `MIN_ROW_H` per semitone, drawVoiceNotes's own STROKE.minWeight
+ * floor (section 10) still applies unconditionally to the rendered note
+ * height regardless of how far rowH itself had to compress -- weighty,
+ * tactile strokes are guaranteed at the note level even in that edge case,
+ * independent of what the row grid above could geometrically afford.
+ *
+ * Cadence pull-back: `pullBack` (0..1) widens every margin by up to 15%
+ * during the piece's final measure and reverb tail -- a slow, stately
+ * opening-up that reveals more of the surrounding vellum right as the
+ * music itself settles. This only affects the nominal (non-wide-compass)
+ * margins; a piece wide enough to already be running against the hard
+ * clearance has nothing left to give pull-back room to open into, which is
+ * an acceptable, rare trade-off against never compressing the voice-leading
+ * itself.
+ */
 function layoutView(score, dpr, pxPerSec, playheadRatio, pullBack) {
   const span = Math.max(10, score.pitchHi - score.pitchLo);
   const width = PLATE.width, height = PLATE.height;
-  // Immersive framing: margins cut a further ~20% from the already-trimmed
-  // values, so the musical lines fill the frame with real presence rather
-  // than floating in a wide, quiet border -- an intimate illuminated page,
-  // not a plate mounted behind glass. The bottom-heavier-than-top ratio
-  // (1.15x) is kept unchanged, so the optical-mount proportion survives the
-  // tighter crop.
-  //
-  // Cadence pull-back: `pullBack` (0..1) widens every margin by up to 15%
-  // during the piece's final measure and reverb tail -- a slow, stately
-  // opening-up that reveals more of the surrounding vellum right as the
-  // music itself settles, rather than staying pressed to the frame's edge
-  // all the way through the final chord. 0 in every ordinary frame, so this
-  // costs nothing outside the last few seconds of a piece.
   const pullFactor = 1 + Math.max(0, Math.min(1, pullBack || 0)) * 0.15;
   const marginX = Math.round(width * 0.06 * pullFactor);
   const marginTop = Math.round(height * 0.068 * pullFactor);
-  // Margin refinement: 1.35x keeps the bottom-heavier-than-top optical-mount
-  // asymmetry, pushed to a magnitude that actually reads at video scale
-  // rather than one so gentle it was nearly imperceptible.
   const marginBottom = Math.round(marginTop * 1.35);
   const innerW = Math.max(40, width - marginX * 2);
-  const innerH = Math.max(24, height - marginTop - marginBottom);
+  const nominalInnerH = Math.max(24, height - marginTop - marginBottom);
+
+  const MIN_ROW_H = STROKE.minWeight + STROKE.laneGap;
+  const HARD_PAD_TOP = 30, HARD_PAD_BOTTOM = 10;
+  const maxContentH = Math.max(1, height - HARD_PAD_TOP - HARD_PAD_BOTTOM);
+  const naturalRowH = nominalInnerH / span;
+  const rowH = Math.min(Math.max(MIN_ROW_H, naturalRowH), maxContentH / span);
+  const contentH = rowH * span;
+
+  let top, bottom;
+  if (contentH <= nominalInnerH + 0.01) {
+    top = marginTop;
+    bottom = marginTop + nominalInnerH;
+  } else {
+    const centerY = HARD_PAD_TOP + maxContentH / 2;
+    top = centerY - contentH / 2;
+    bottom = centerY + contentH / 2;
+  }
+
   return {
     width, height, dpr, pxPerSec,
     left: marginX, right: marginX + innerW,
-    top: marginTop, bottom: marginTop + innerH,
-    innerW, innerH,
-    rowH: innerH / span,
+    top, bottom,
+    innerW, innerH: contentH,
+    rowH,
     // The golden division (1 - 1/phi): a mathematically exact split between
     // "history" and "what's coming," not an approximation of one.
     playheadX: marginX + Math.round(innerW * (playheadRatio == null ? 0.381966 : playheadRatio)),
@@ -1288,11 +1452,17 @@ function drawPaper(ctx, score, v, paper, showRules, canvas) {
   const dpr = v.dpr || 1;
   const half = 0.5 / dpr;
 
+  // Clean octave guidelines: the ONLY background pitch-guide lines on the
+  // whole plate are the true octave (C-note) lines, restricted to C1
+  // through C6 -- no minor sub-lines, no clutter beyond the piece's most
+  // readable register span -- at a whisper-quiet 8% opacity.
   ctx.strokeStyle = THEME.ruleOctave;
   ctx.lineWidth = 0.5 / dpr;
   ctx.beginPath();
   for (let m = v.pitchBottom; m <= v.pitchTop; m++) {
     if (m % 12 !== 0) continue;
+    const octaveNum = Math.floor(m / 12) - 1;
+    if (octaveNum < 1 || octaveNum > 6) continue;
     const y = snap(yOfMidi(v, m), dpr) + half;
     ctx.moveTo(v.left, y);
     ctx.lineTo(v.right, y);
@@ -1304,7 +1474,9 @@ function drawPaper(ctx, score, v, paper, showRules, canvas) {
   ctx.textBaseline = "middle";
   for (let m = v.pitchBottom; m <= v.pitchTop; m++) {
     if (m % 12 !== 0) continue;
-    ctx.fillText(`C${Math.floor(m / 12) - 1}`, v.left - 28, snap(yOfMidi(v, m), dpr));
+    const octaveNum = Math.floor(m / 12) - 1;
+    if (octaveNum < 1 || octaveNum > 6) continue;
+    ctx.fillText(`C${octaveNum}`, v.left - 28, snap(yOfMidi(v, m), dpr));
   }
 }
 
@@ -1363,24 +1535,37 @@ function drawRules(ctx, score, v, t, windowStart, windowEnd) {
   ctx.stroke();
 }
 
+/**
+ * Absolute, uniform note mass -- not fragile ribbons, and not a
+ * register-scaled gradient either.
+ *
+ * `weight` and `minWeight` are now the SAME fixed value (15.2px), rendered
+ * unconditionally for every note in drawVoiceNotes regardless of voice,
+ * register, or how a wide-compass score would otherwise want to compress
+ * lane height: every note on the plate shares identical physical stature.
+ * Recalibrated down from an earlier 19px so close scale steps (2nds) keep
+ * clean daylight between adjacent strokes without ever reading as thin.
+ * layoutView's own MIN_ROW_H recalibration (see section 9) is derived from
+ * this same constant, so it automatically grows in step -- the two work
+ * together, not one instead of the other.
+ */
 const STROKE = {
-  // Substantial (not thin) but bounded, and -- the actual fix -- paired with
-  // a real laneGap. At the old 15.5/0.8 pairing, any voice pair closer than a
-  // major second in a moderately wide-range piece was rendering with under a
-  // pixel of daylight between blocks, which is the one thing a contrapuntal
-  // plate cannot afford: two voices merging into one shape erases the
-  // harmonic interval between them. laneGap is now large enough to always
-  // read as a gap; weight is pulled back only enough to make room for it, and
-  // the plate's own vertical margins (see layoutView) were trimmed slightly
-  // so lane height grows too, rather than note weight being the only line
-  // item that pays for the extra separation.
-  weight: 11,
-  minWeight: 6.5,
+  weight: 15.2,
+  minWeight: 15.2,
   laneGap: 2.3,
   radius: 1.7,
   grain: 0.35,
   minLength: 4.5,
 };
+
+/**
+ * Unison vertical offset: how far each voice's own centre is nudged off
+ * the shared pitch centreline when two different voices sound the exact
+ * same pitch at once (see analyzeNoteCollisions / drawVoiceNotes). Kept
+ * small relative to STROKE.weight so most of each voice's own 15.2px
+ * stature still sits outside the shared, blended middle band.
+ */
+const UNISON_OFFSET = 2.8;
 
 /**
  * A stamped rectangular bar, not a calligraphic stroke.
@@ -1460,11 +1645,14 @@ function woodblockEdge(ctx, x0, x1, yc, half, seed, top) {
  * plane. Two cheap batched stroke passes over the SAME notes just filled,
  * at 4-6% opacity: present enough to read as tactile depth, never enough to
  * compete with the ink itself or imply the note is anything but flat ink on
- * flat paper.
+ * flat paper. The 0.75px capillary drying edge is the fixed floor -- present
+ * even at high device pixel ratios, never thinned away to nothing, and it is
+ * the one trace of a stroke that survives permanently once the wet-ink sheen
+ * (see fillWetInk) has fully dried down and absorbed away.
  */
 function drawInkBite(ctx, notes, ds) {
   if (notes.length === 0) return;
-  ctx.lineWidth = Math.max(0.6, 1 / ds);
+  ctx.lineWidth = Math.max(0.55, 0.75 / ds);
   ctx.beginPath();
   for (let j = 0; j < notes.length; j++) {
     const n = notes[j];
@@ -1481,31 +1669,278 @@ function drawInkBite(ctx, notes, ds) {
   ctx.stroke();
 }
 
-function drawVoiceNotes(ctx, voice, v, t, from, windowStart, windowEnd, state, sc, out, tensionBuf) {
+/**
+ * A colour string's RGB channels reused at a new, explicit alpha -- accepts
+ * either the `rgb(r,g,b)` or `rgba(r,g,b,a)` forms this file's own palette
+ * functions produce (see rgbStr/rgbaStr) and always returns the latter, with
+ * whatever alpha the caller wants rather than whatever the string already
+ * carried. Falls back to returning the string unchanged if it is not one of
+ * those two recognizable forms.
+ */
+function colorWithAlpha(color, alpha) {
+  const m = /rgba?\(([^)]+)\)/.exec(String(color));
+  if (!m) return color;
+  const parts = m[1].split(",").map((s) => s.trim());
+  const r = parts[0], g = parts[1], b = parts[2];
+  return `rgba(${r}, ${g}, ${b}, ${alpha.toFixed(3)})`;
+}
+
+/**
+ * Dried matte ink -- the resting-note counterpart to fillWetInk (below).
+ *
+ * A note that is NOT currently sounding is settled, quiet pigment already
+ * absorbed into the paper's own tooth: a real, visible top-to-bottom fluid
+ * gradient (0.64 -> 0.94) rather than a near-flat wash, reading as an
+ * upper wash settling down into deep, concentrated sediment at the bottom
+ * edge -- never the commanding wet-ink saturation, and never the meniscus
+ * highlight or sediment shadow a currently-sounding note gets. One
+ * gradient object and one fill per note, exactly like its wet
+ * counterpart, so the two states cost the same regardless of which one a
+ * given frame draws more of.
+ */
+function fillMatteInk(ctx, notes, color) {
+  if (notes.length === 0) return;
+  const ambientAlpha = ctx.globalAlpha;
+  const ambientComposite = ctx.globalCompositeOperation;
+  ctx.globalCompositeOperation = "multiply";
+  ctx.globalAlpha = ambientAlpha;
+  for (let i = 0; i < notes.length; i++) {
+    const n = notes[i];
+    const grad = ctx.createLinearGradient(n.x0, n.y - n.half, n.x0, n.y + n.half);
+    grad.addColorStop(0, colorWithAlpha(color, 0.64));
+    grad.addColorStop(1, colorWithAlpha(color, 0.94));
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    woodblockPath(ctx, n.x0, n.x1, n.y, n.half, STROKE.radius, noteSeed(n.id));
+    ctx.fill();
+  }
+  ctx.globalCompositeOperation = ambientComposite;
+  ctx.globalAlpha = ambientAlpha;
+}
+
+/**
+ * Liquid sheen & meniscus -- the sounding-note counterpart to fillMatteInk.
+ *
+ * The instant a note is struck it stops reading as dried, settled pigment
+ * and surges toward full, commanding wet-ink saturation: each note's own
+ * per-frame `sheen` value (supplied by drawVoiceNotes, ramping up across
+ * the attack and back down across the release dry-down) drives a vertical
+ * gradient toward alpha ~0.98 at its peak, rather than a fixed constant --
+ * so the wet-in and dry-down transitions actually show on the ink itself,
+ * not just in the note's physical swell.
+ *
+ * Two more traits real wet ink shows that dry pigment does not are added as
+ * cheap batched stroke passes over the same note set, at typographic scale:
+ * a delicate meniscus highlight where light catches the curved surface of
+ * fresh liquid along the TOP edge, and a deeper sediment shadow where the
+ * fluid pools thickest along the BOTTOM edge. Both reuse the exact same
+ * grain-wobbled edge path woodblockEdge already draws for the permanent
+ * ink-bite, so they read as the note's own surface catching light, not a
+ * second geometric layer pasted over it.
+ *
+ * A third, smaller pass adds leading strike density: the physical impact
+ * pool where ink first meets paper, before it has had time to flow down
+ * the rest of the stroke -- a modest +10% relative concentration confined
+ * to the note's own leading 16 device-independent px, clipped per note so
+ * it only ever darkens that one small wedge at the attack.
+ */
+function fillWetInk(ctx, notes, color, ds) {
+  if (notes.length === 0) return;
+  const ambientAlpha = ctx.globalAlpha;
+  const ambientComposite = ctx.globalCompositeOperation;
+  ctx.globalCompositeOperation = "multiply";
+  ctx.globalAlpha = ambientAlpha;
+  for (let i = 0; i < notes.length; i++) {
+    const n = notes[i];
+    const peak = n.sheen != null ? n.sheen : 0.98;
+    const grad = ctx.createLinearGradient(n.x0, n.y - n.half, n.x0, n.y + n.half);
+    grad.addColorStop(0, colorWithAlpha(color, Math.max(0, peak - 0.10)));
+    grad.addColorStop(1, colorWithAlpha(color, Math.min(0.98, peak)));
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    woodblockPath(ctx, n.x0, n.x1, n.y, n.half, STROKE.radius, noteSeed(n.id));
+    ctx.fill();
+  }
+
+  // Leading strike density: see docblock above. Confined per note to a
+  // clipped leading wedge so it never spills past a genuinely short note's
+  // own full length.
+  const poolLen = 16 / (ds || 1);
+  for (let i = 0; i < notes.length; i++) {
+    const n = notes[i];
+    const w = Math.min(poolLen, n.x1 - n.x0);
+    if (w <= 0.5) continue;
+    const peak = n.sheen != null ? n.sheen : 0.98;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(n.x0, n.y - n.half - 1, w, n.half * 2 + 2);
+    ctx.clip();
+    ctx.globalAlpha = Math.min(1, peak * 0.10);
+    ctx.beginPath();
+    woodblockPath(ctx, n.x0, n.x1, n.y, n.half, STROKE.radius, noteSeed(n.id));
+    ctx.fillStyle = color;
+    ctx.fill();
+    ctx.restore();
+  }
+
+  ctx.globalCompositeOperation = ambientComposite;
+  ctx.globalAlpha = ambientAlpha;
+
+  // Meniscus highlight: fresh liquid catching light along the top edge.
+  ctx.beginPath();
+  for (let i = 0; i < notes.length; i++) {
+    const n = notes[i];
+    woodblockEdge(ctx, n.x0, n.x1, n.y, n.half, noteSeed(n.id), true);
+  }
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.16)";
+  ctx.lineWidth = Math.max(0.5, 0.6 / (ds || 1));
+  ctx.stroke();
+
+  // Sediment shadow: pigment pooling deepest along the bottom edge.
+  ctx.beginPath();
+  for (let i = 0; i < notes.length; i++) {
+    const n = notes[i];
+    woodblockEdge(ctx, n.x0, n.x1, n.y, n.half, noteSeed(n.id), false);
+  }
+  ctx.strokeStyle = "rgba(20, 14, 8, 0.14)";
+  ctx.lineWidth = Math.max(0.5, 0.6 / (ds || 1));
+  ctx.stroke();
+}
+
+/**
+ * Cross-voice collision analysis: unison pitch overlaps and abutting
+ * same-pitch attacks, computed ONCE per frame across every voice's visible
+ * notes -- drawVoiceNotes only ever sees one voice at a time, so this is
+ * the one place that can actually see two voices colliding.
+ *
+ * Unison: when two DIFFERENT voices sound the identical MIDI pitch with
+ * overlapping time spans, laying both at the exact same y and letting the
+ * ordinary multiply blend merge them only looked right where the two
+ * notes' time spans fully coincided -- the instant one note started or
+ * ended partway inside the other's own duration, the merged hue only
+ * covered that overlapping stretch of x, and the bar read as abruptly
+ * switching colour mid-note rather than as one continuous stroke. Each
+ * voice now keeps its full, identical 15.2px stature but its own centre is
+ * nudged a fixed UNISON_OFFSET off the shared pitch centreline -- the
+ * upper voice up, the lower voice down -- so only a narrow shared band in
+ * the middle actually overlaps and blends; the rest of each voice's own
+ * stroke, above or below that band, stays its own pure, unbroken colour
+ * for the note's entire sounding duration, in or out of the collision.
+ * Each note in the pair is still tagged "top" or "bottom" purely by each
+ * voice's own position in score.voices, the same top-to-bottom convention
+ * the plate legend and registerWeight already use, so a Soprano/Bass
+ * unison always resolves the same way regardless of which happened to be
+ * scanned first; drawVoiceNotes uses the "top" tag both to choose the
+ * offset direction and to queue a single internal dividing hairline for
+ * the pair (see drawUnisonDividers), drawn at the shared, un-offset
+ * centreline between them.
+ *
+ * Abutting attacks: whenever one note ends right where another begins AT
+ * THE SAME PITCH -- a repeated note within one voice, or a hand-off between
+ * two -- the two strokes would otherwise share an edge and read as one
+ * continuous bar rather than two distinct attacks. gapBefore marks the
+ * later note so drawVoiceNotes can nudge its onset forward by a crisp,
+ * fixed 1.5px.
+ *
+ * Cost: one sort of the visible-note set (a single viewport's worth of
+ * notes, never the whole score) followed by a scan that, thanks to the
+ * sort, only ever compares notes sharing an exact MIDI pitch -- every other
+ * pair is skipped in O(1) the moment pitches stop matching.
+ */
+function collectVisibleNotes(score, cursors, windowStart, windowEnd) {
+  const list = [];
+  for (let vi = 0; vi < score.voices.length; vi++) {
+    const voice = score.voices[vi];
+    for (let i = cursors[vi]; i < voice.notes.length; i++) {
+      const n = voice.notes[i];
+      if (n.startSec > windowEnd) break;
+      if (n.endSec < windowStart) continue;
+      list.push({ id: n.id, voiceId: voice.id, voiceIndex: vi, midi: n.midi, startSec: n.startSec, endSec: n.endSec });
+    }
+  }
+  return list;
+}
+
+function analyzeNoteCollisions(score, cursors, windowStart, windowEnd) {
+  const notes = collectVisibleNotes(score, cursors, windowStart, windowEnd);
+  if (notes.length < 2) return null;
+  notes.sort((a, b) => a.midi - b.midi || a.startSec - b.startSec);
+
+  let roles = null, gapBefore = null;
+  for (let i = 0; i < notes.length; i++) {
+    const a = notes[i];
+    for (let j = i + 1; j < notes.length; j++) {
+      const b = notes[j];
+      if (b.midi !== a.midi) break; // sorted by pitch -- nothing further can match
+      if (b.voiceId !== a.voiceId) {
+        const overlaps = a.startSec < b.endSec - 1e-6 && b.startSec < a.endSec - 1e-6;
+        if (overlaps) {
+          const upper = a.voiceIndex <= b.voiceIndex ? a : b;
+          const lower = upper === a ? b : a;
+          if (!roles) roles = new Map();
+          roles.set(upper.id, "top");
+          roles.set(lower.id, "bottom");
+        }
+      }
+      if (Math.abs(b.startSec - a.endSec) < 0.02) { if (!gapBefore) gapBefore = new Set(); gapBefore.add(b.id); }
+      else if (Math.abs(a.startSec - b.endSec) < 0.02) { if (!gapBefore) gapBefore = new Set(); gapBefore.add(a.id); }
+    }
+  }
+  return (roles || gapBefore) ? { roles, gapBefore } : null;
+}
+
+function drawVoiceNotes(ctx, voice, v, t, from, windowStart, windowEnd, state, sc, out, tensionBuf, collisions, dividerBuf) {
   const ds = v.dpr || 1;
-  const weight = voice.weight || { width: 1 };
   out.drawn = 0; out.sounding = 0; out.thematic = 0;
 
-  const lane = Math.max(STROKE.minWeight, v.rowH - STROKE.laneGap);
-  const wanted = Math.min(STROKE.weight * weight.width, lane);
-  const hDev = Math.max(5, Math.round(wanted * ds));
+  // Absolute uniform note stature: every voice, every register, every note
+  // gets the identical commanding 15.2px mass -- no register-based scaling
+  // by voice.weight, no lane-based compression. STROKE.weight and
+  // STROKE.minWeight are both fixed at 15.2 for exactly this reason (see the
+  // STROKE comment above), so this is simply that constant, snapped to the
+  // device pixel grid.
+  const hDev = Math.max(5, Math.round(STROKE.weight * ds));
   const height = hDev / ds;
   const half = height * 0.5;
   const oddOffset = hDev % 2 ? 0.5 / ds : 0;
 
   const restingNotes = [];
   const activeNotes = [];
+  const roles = collisions && collisions.roles;
+  const gapBefore = collisions && collisions.gapBefore;
 
   for (let i = from; i < voice.notes.length; i++) {
     const n = voice.notes[i];
     if (n.startSec > windowEnd) break;
     if (n.endSec < windowStart) continue;
 
-    const x0 = snap(xOfSec(v, n.startSec, t), ds);
+    let x0 = snap(xOfSec(v, n.startSec, t), ds);
+    // A crisp, fixed 1.5px physical gap before any note that directly abuts
+    // a same-pitch predecessor (see analyzeNoteCollisions) -- otherwise two
+    // consecutive attacks at the same pitch share an edge and read as one
+    // continuous bar rather than two distinct strikes.
+    if (gapBefore && gapBefore.has(n.id)) x0 += 1.5;
     const x1 = Math.max(x0 + STROKE.minLength, snap(xOfSec(v, n.endSec, t), ds));
     if (x1 < v.left - 50 || x0 > v.right + 50) continue;
 
-    const y = snap(yOfMidi(v, n.midi), ds) + oddOffset;
+    const centerY = snap(yOfMidi(v, n.midi), ds) + oddOffset;
+    const baseHalf = half;
+    // Voice crossing & unison: each voice keeps its full, identical 15.2px
+    // stature, but a colliding pair no longer shares the exact same y (see
+    // the analyzeNoteCollisions docblock for why). "top" nudges up and
+    // "bottom" nudges down by a fixed UNISON_OFFSET, so only a narrow
+    // shared band in the middle actually overlaps and blends via the
+    // ordinary multiply composite -- the rest of each voice's own stroke
+    // stays its own pure colour for the note's whole duration. The single
+    // internal dividing hairline is still queued once per pair (from the
+    // "top" note only) at the shared, un-offset centreline, drawn after
+    // every voice's own ink is down, in drawUnisonDividers.
+    const role = roles && roles.get(n.id);
+    let y = centerY;
+    if (role === "top") y = snap(centerY - UNISON_OFFSET, ds);
+    else if (role === "bottom") y = snap(centerY + UNISON_OFFSET, ds);
+    if (role === "top" && dividerBuf) dividerBuf.push({ x0, x1, y: centerY, half: baseHalf });
+
     const dur = Math.max(0.06, n.endSec - n.startSec);
 
     let breathe = 0;
@@ -1517,28 +1952,62 @@ function drawVoiceNotes(ctx, voice, v, t, from, windowStart, windowEnd, state, s
       const elapsed = t - n.startSec;
       const vel = Math.max(0.4, Math.min(1.0, n.vel || 0.75));
 
-      const peakSwell = 0.75 + vel * 0.85;
+      // Hydraulic impact expansion: a cushioned pen-pressure swell held to
+      // a strict 10%-12% of the note's own half-height across the full
+      // velocity range -- the strike reads as one tangible, visible event,
+      // never a rubbery balloon and never a mechanical shake. It settles
+      // smoothly over ~120ms down to a subtle +3% "living breath" cushion,
+      // which then keeps the ink alive with a gentle, continuous
+      // respiration wave (see breathPulse below) for as long as the note
+      // continues sounding -- never decaying away to nothing, and never
+      // truly freezing in place either.
+      const peakSwell = baseHalf * (0.10 + vel * 0.02);
+      const sustainSwell = baseHalf * 0.03;
       const attackTime = Math.min(0.035, dur * 0.25);
-      let env = 0;
+      const settleTime = 0.12;
+      let env;
 
       if (elapsed < attackTime) {
         env = peakSwell * (elapsed / attackTime);
       } else {
-        const settleProgress = Math.min(1, (elapsed - attackTime) / 0.07);
-        const sustainLevel = 0.32 * vel;
-        env = sustainLevel + (peakSwell - sustainLevel) * Math.exp(-settleProgress * 3.5);
+        const settleElapsed = elapsed - attackTime;
+        const k = Math.min(1, settleElapsed / settleTime);
+        // Cubic ease-out: a smooth, cushioned settle down to the living
+        // breath cushion, not a mechanical snap or an elastic overshoot.
+        const eased = 1 - Math.pow(1 - k, 3);
+        env = peakSwell + (sustainSwell - peakSwell) * eased;
       }
 
       breathe = env;
-      activeNotes.push({ x0, x1, y, half: half + (breathe * 0.5), id: n.id, dur, breathe, midi: n.midi, elapsed });
-      if (tensionBuf) tensionBuf.push({ x0, x1, y, half: half + (breathe * 0.5), midi: n.midi, voiceId: voice.id });
+      // Living hydraulic respiration: once the initial attack has settled
+      // (above), the note is no longer frozen -- a gentle, continuous
+      // breathing wave keeps riding on the settled living-breath cushion
+      // for as long as the note keeps sounding, seeded per-note (noteSeed)
+      // so simultaneously-held notes don't all pulse in lockstep. It
+      // contributes nothing once the note ends, handing off cleanly to the
+      // permanent capillary drying edge (see isPostRelease below).
+      const breathPulse = Math.sin((elapsed - 0.12) * 3.6 + noteSeed(n.id) * 6.28) * (baseHalf * 0.032);
+      // Liquid sheen: the ink's own alpha ramps up out of the resting matte
+      // tone (~0.72) toward full, commanding wet saturation (~0.98) across
+      // the very same attack window the hydraulic swell above uses, so the
+      // stroke visually "wets" exactly as it physically expands.
+      const wetIn = Math.min(1, elapsed / Math.max(0.001, attackTime));
+      const sheen = 0.72 + (0.98 - 0.72) * wetIn;
+      activeNotes.push({ x0, x1, y, half: baseHalf + (breathe * 0.5) + breathPulse, id: n.id, dur, breathe, midi: n.midi, elapsed, vel: n.vel, sheen });
+      if (tensionBuf) tensionBuf.push({ x0, x1, y, half: baseHalf + (breathe * 0.5) + breathPulse, midi: n.midi, voiceId: voice.id });
     } else if (isPostRelease) {
+      // Release dry-down: the liquid sheen absorbs back into the rag paper
+      // over ~80ms -- the living breath cushion fading to nothing and the
+      // wet alpha settling back to the dry matte resting tone -- leaving
+      // only the permanent 0.75px capillary drying edge (drawInkBite) as
+      // the note's lasting mark once the fade completes.
       const relElapsed = t - n.endSec;
       const relFade = Math.max(0, 1 - (relElapsed / 0.08));
-      breathe = 0.35 * Math.pow(relFade, 2);
-      activeNotes.push({ x0, x1, y, half: half + (breathe * 0.5), id: n.id, dur, breathe, midi: n.midi, elapsed: dur });
+      breathe = baseHalf * 0.03 * relFade;
+      const sheen = 0.72 + (0.98 - 0.72) * relFade;
+      activeNotes.push({ x0, x1, y, half: baseHalf + (breathe * 0.5), id: n.id, dur, breathe, midi: n.midi, elapsed: dur, vel: n.vel, sheen });
     } else {
-      restingNotes.push({ x0, x1, y, half, id: n.id, dur });
+      restingNotes.push({ x0, x1, y, half: baseHalf, id: n.id, dur, vel: n.vel });
     }
 
     out.drawn++;
@@ -1546,24 +2015,22 @@ function drawVoiceNotes(ctx, voice, v, t, from, windowStart, windowEnd, state, s
   }
 
   if (restingNotes.length > 0) {
-    ctx.beginPath();
-    for (let j = 0; j < restingNotes.length; j++) {
-      const rn = restingNotes[j];
-      woodblockPath(ctx, rn.x0, rn.x1, rn.y, rn.half, STROKE.radius, noteSeed(rn.id));
+    if (state.audible) {
+      fillMatteInk(ctx, restingNotes, voice.palette.base);
+      drawInkBite(ctx, restingNotes, ds);
+    } else {
+      ctx.beginPath();
+      for (let j = 0; j < restingNotes.length; j++) {
+        const rn = restingNotes[j];
+        woodblockPath(ctx, rn.x0, rn.x1, rn.y, rn.half, STROKE.radius, noteSeed(rn.id));
+      }
+      ctx.fillStyle = voice.palette.silent;
+      ctx.fill();
     }
-    ctx.fillStyle = state.audible ? voice.palette.resting : voice.palette.silent;
-    ctx.fill();
-    if (state.audible) drawInkBite(ctx, restingNotes, ds);
   }
 
   if (activeNotes.length > 0) {
-    ctx.beginPath();
-    for (let k = 0; k < activeNotes.length; k++) {
-      const an = activeNotes[k];
-      woodblockPath(ctx, an.x0, an.x1, an.y, an.half, STROKE.radius, noteSeed(an.id));
-    }
-    ctx.fillStyle = voice.palette.base;
-    ctx.fill();
+    fillWetInk(ctx, activeNotes, voice.palette.base, ds);
     drawInkBite(ctx, activeNotes, ds);
 
     // Pedal-point ink pooling: on notes long enough to actually sustain
@@ -1572,8 +2039,8 @@ function drawVoiceNotes(ctx, voice, v, t, from, windowStart, windowEnd, state, s
     // were settling further into the fibres the longer it sits. A single
     // extra fill per qualifying note, individually coloured -- and in real
     // Bach counterpoint there are rarely more than one or two such notes
-    // sounding at once, so this never threatens the batched-fill budget the
-    // rest of the pass depends on.
+    // sounding at once, so this never threatens the per-note wash budget the
+    // rest of the pass already spends.
     const rgb = voice.palette.rgb;
     for (let k = 0; k < activeNotes.length; k++) {
       const an = activeNotes[k];
@@ -1627,6 +2094,32 @@ function drawCapillaryTension(ctx, candidates, dpr) {
   }
   if (!any) return;
   ctx.strokeStyle = "rgba(20, 14, 8, 0.06)";
+  ctx.lineWidth = px;
+  ctx.stroke();
+}
+
+/**
+ * The unison seam: a single delicate 1px hairline drawn at the shared,
+ * un-offset pitch centreline between two notes that collide -- the same
+ * pitch, the same instant, two different voices -- right through the
+ * middle of the narrow band where their now vertically-offset strokes
+ * (see UNISON_OFFSET / drawVoiceNotes) actually overlap and blend. Queued
+ * once per colliding pair by drawVoiceNotes (see the "top"-tagged branch
+ * there) and drawn here, AFTER every voice's own ink is already down, so
+ * it reads as a fine seam inside the shared band rather than a line
+ * floating over bare paper.
+ */
+function drawUnisonDividers(ctx, dividers, dpr) {
+  if (!dividers || dividers.length === 0) return;
+  const px = 1 / (dpr || 1);
+  ctx.beginPath();
+  for (let i = 0; i < dividers.length; i++) {
+    const d = dividers[i];
+    const y = snap(d.y, dpr) + px * 0.5;
+    ctx.moveTo(d.x0, y);
+    ctx.lineTo(d.x1, y);
+  }
+  ctx.strokeStyle = "rgba(255, 250, 235, 0.22)";
   ctx.lineWidth = px;
   ctx.stroke();
 }
@@ -1702,14 +2195,57 @@ function drawPlateLegend(ctx, score, v) {
   ctx.restore();
 }
 
+/**
+ * The macro overview strip beneath the deck: a condensed, whole-piece
+ * silhouette of note density per voice row, with a hairline cursor marking
+ * the current playhead position. Ink on paper only, no glow, matching every
+ * other mark on the plate.
+ */
+function drawMinimap(ctx, score, analysis, width, height, t, rowOf) {
+  ctx.clearRect(0, 0, width, height);
+  if (!score || !(width > 0) || !(height > 0)) return;
+  const dur = Math.max(1e-6, score.durSec);
+  const rows = Math.max(1, score.voices.length);
+  const rowH = height / rows;
+
+  ctx.fillStyle = THEME.minimapInk;
+  for (const voice of score.voices) {
+    const row = (rowOf && rowOf[voice.id] != null && rowOf[voice.id] >= 0) ? rowOf[voice.id] : 0;
+    const y = row * rowH + rowH * 0.15;
+    const h = Math.max(1, rowH * 0.7);
+    for (const n of voice.notes) {
+      const x0 = (n.startSec / dur) * width;
+      const x1 = Math.max(x0 + 0.6, (n.endSec / dur) * width);
+      ctx.fillRect(x0, y, x1 - x0, h);
+    }
+  }
+
+  const x = Math.max(0, Math.min(width, (t / dur) * width));
+  ctx.strokeStyle = THEME.minimapCursor;
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(x + 0.5, 0);
+  ctx.lineTo(x + 0.5, height);
+  ctx.stroke();
+}
+
 /* ==========================================================================
  * 11. PROLOGUE (Dynamic Auto-Measuring Table Layout)
  * ========================================================================== */
 
 const PROLOGUE_SEC = 3.5;
 const UNFOLD_START = 2.6;
+// Golden-ratio breathing room beneath the melodic contour blueprint (see
+// gapRuleCatalog in drawMonogram), rather than an arbitrary multiple of
+// the catalogue's own type size.
+const GOLDEN_RATIO = 1.6180339887;
 const DISPLAY_STACK = '"EB Garamond","Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif';
 const MONO_STACK = '"Geist Mono",ui-monospace,"SF Mono","JetBrains Mono",Menlo,monospace';
+// The title card's own display face: elegant, humanist Cormorant Garamond
+// set in dignified Title Case -- the poise of an authentic 18th-century
+// copperplate title page, not a screaming, all-caps engraved display face
+// or the general body serif used everywhere else on the plate.
+const TITLE_STACK = '"Cormorant Garamond",serif';
 
 const inkOf = () => THEME.ink;
 const inkSoftOf = () => THEME.inkSoft;
@@ -1741,42 +2277,29 @@ const STAMP_SETTLE = 0.45;
  *
  * A physical stamp strikes instantly -- full position, full ink, in one
  * frame, not eased in from nothing or slid from off-plate. What DOES take a
- * moment is the impression settling into the fibres: a soft plate-mark
- * rectangle -- the literal indented border a real printing plate leaves in
- * paper -- fades up around the title block over STAMP_SETTLE seconds,
- * using the exact same dark-top-left/light-bottom-right bevel convention as
- * every note's own ink-bite. That reuse is deliberate: the card should
- * speak the same physical language as the music it introduces, not a
- * separate "UI" language of its own.
+ * moment is the impression settling into the fibres, and -- the card's true
+ * centerpiece -- the melodic contour blueprint of the opening subject,
+ * drawn over its own faint 5-line drafting stave in bistre ink, pivot notes
+ * marked. As the prologue's own `e` (0 -> 1) carries the title card away,
+ * every contour point glides in a straight line from its position inside
+ * this card out to its real coordinate on the staves, so the sketch hands
+ * off seamlessly to the actual notes fading in at that very same spot. A
+ * confident, generously-tracked serif title sits above -- rendered with its
+ * own letterpress ink-bite (see fillTitlePressed), so it reads as genuinely
+ * pressed from an engraved copperplate rather than flat word-processor
+ * text; a quiet, tracked small-caps catalogue number sits below. No
+ * catalogue table, no matrix chart, no pseudo-Italian attribution line, no
+ * decorative seal or clipart -- the spatial composition, the paper, and the
+ * ink carry the whole authority of the page.
  *
- * `stampT` is seconds elapsed since the prologue itself began. A still
- * export (the video thumbnail) has no elapsed time to speak of and should
- * show the page already settled, so it passes null/omits the argument.
+ * `stampT` is seconds elapsed since the prologue itself began; kept as a
+ * parameter for callers that may want it, though the current layout does
+ * not need it directly -- `u`/`e` alone drive the whole animation.
  */
-function drawPlateMark(ctx, x, y, w, h, alpha, dpr) {
-  if (alpha <= 0.003) return;
-  const inset = 1.4 / (dpr || 1);
-  ctx.beginPath();
-  ctx.moveTo(x, y + h);
-  ctx.lineTo(x, y);
-  ctx.lineTo(x + w, y);
-  ctx.strokeStyle = `rgba(15, 10, 5, ${0.09 * alpha})`;
-  ctx.lineWidth = inset;
-  ctx.stroke();
-  ctx.beginPath();
-  ctx.moveTo(x + inset * 2, y + h + inset * 2);
-  ctx.lineTo(x + w + inset * 2, y + h + inset * 2);
-  ctx.lineTo(x + w + inset * 2, y + inset * 2);
-  ctx.strokeStyle = `rgba(255, 250, 235, ${0.08 * alpha})`;
-  ctx.lineWidth = inset;
-  ctx.stroke();
-}
-
 function drawMonogram(ctx, m, score, view, w, h, u, stampT) {
   if (w <= 0 || h <= 0) return { scoreAlpha: 1, done: true };
   const e = ease(u);
   const cardAlpha = 1 - e;
-  const settle = stampT == null ? 1 : Math.min(1, Math.max(0, stampT / STAMP_SETTLE));
 
   ctx.save();
   ctx.fillStyle = THEME.paper;
@@ -1784,131 +2307,209 @@ function drawMonogram(ctx, m, score, view, w, h, u, stampT) {
   ctx.fillRect(0, 0, w, h);
   ctx.globalAlpha = 1;
 
-  const margin = h * 0.085;
-  const serif = (size) => `${size}px ${DISPLAY_STACK}`;
-  const mono = (size) => `${size}px ${MONO_STACK}`;
-
   if (cardAlpha > 0.004) {
+    // Ink absorbing into the page, not text painted over it -- the exact
+    // same compositing every note on the plate itself uses.
+    ctx.globalCompositeOperation = THEME.blend;
     ctx.globalAlpha = cardAlpha;
     ctx.textBaseline = "alphabetic";
-    ctx.textAlign = "left";
+    ctx.textAlign = "center";
 
-    const titleSize = h * 0.082;
-    ctx.fillStyle = inkOf(); ctx.font = serif(titleSize);
-    const titleY = margin + titleSize;
-    if (m._wrapW !== w) { m._wrapW = w; m._lines = wrapText(ctx, m.title, w * 0.46); }
+    const cx = w * 0.5;
+    // Elegant, humanist scale: ~5.2% of plate height, weight 600, with
+    // generous, balanced letter-spacing and its own letterpress ink-bite --
+    // the poise of an authentic 18th-century copperplate title page, not a
+    // screaming, all-caps engraved display face or a website header set in
+    // a lightweight word-processor font.
+    const titleSize = h * 0.052;
+    const catalogSize = h * 0.02;
+    const lead = titleSize * 1.22;
+    // Full 65% of plate width and 18% of plate height: the melodic contour
+    // blueprint as the card's true centerpiece (see drawContour), not a
+    // cramped footnote sketch.
+    const glyphBoxW = w * 0.65;
+    const glyphBoxH = h * 0.18;
+    const gapTitleGlyph = h * 0.032;
+    const gapGlyphRule = h * 0.026;
+    const gapRuleCatalog = catalogSize * GOLDEN_RATIO;
+
+    ctx.fillStyle = inkOf();
+    ctx.font = `600 ${titleSize}px ${TITLE_STACK}`;
+    if (m._wrapW !== w) { m._wrapW = w; m._lines = wrapText(ctx, m.title, w * 0.62); }
     const lines = m._lines;
-    lines.forEach((line, i) => ctx.fillText(line, margin, titleY + i * titleSize * 1.12));
+    const titleBlockH = lines.length * lead;
+    const blockH = titleBlockH + gapTitleGlyph + glyphBoxH + gapGlyphRule + catalogSize + gapRuleCatalog;
 
-    const ruleY = titleY + lines.length * titleSize * 1.12 + h * 0.03;
-    ctx.strokeStyle = ruleOf(); ctx.lineWidth = Math.max(1, h * 0.0012);
-    ctx.beginPath(); ctx.moveTo(margin, ruleY); ctx.lineTo(margin + w * 0.42, ruleY); ctx.stroke();
+    let y = h * 0.5 - blockH * 0.5 + titleSize;
+    const titleTracking = Math.max(0.6, titleSize * 0.07);
+    const dpr = view ? (view.dpr || 1) : 1;
+    lines.forEach((line) => { fillTitlePressed(ctx, line, cx, y, titleTracking, dpr); y += lead; });
 
-    const metaSize = h * 0.0215;
-    ctx.font = mono(metaSize);
+    // The melodic contour blueprint -- the centerpiece of the opening.
+    const glyphBoxTop = y + gapTitleGlyph;
+    const glyphBoxX = cx - glyphBoxW / 2;
+    drawContour(ctx, m.glyph, view, glyphBoxX, glyphBoxTop, glyphBoxW, glyphBoxH, e, cardAlpha);
 
-    // Clean historical attribution: eliminate ugly "CATALOGUE —"
-    const hasCatalogue = m.catalogue && m.catalogue !== "\u2014" && m.catalogue !== "-";
-    const rows = [
-      [hasCatalogue ? "CATALOGUE" : "WORK", hasCatalogue ? m.catalogue : m.title],
-      ["ARCHITECTURE", m.architecture],
-      ["TONALITY", m.tonality],
-      ["MEASURES", m.measures],
-    ];
+    // A hair-thin, organic dividing stroke beneath the contour -- barely
+    // there, the way a single ruled line under a heading settles into old
+    // paper rather than announcing itself as a UI divider.
+    const ruleY = glyphBoxTop + glyphBoxH + gapGlyphRule;
+    ctx.strokeStyle = ruleOf();
+    ctx.lineWidth = Math.max(0.35, 0.7 / (view ? (view.dpr || 1) : 1));
+    ctx.globalAlpha = cardAlpha * 0.35;
+    ctx.beginPath();
+    ctx.moveTo(cx - w * 0.09, ruleY);
+    ctx.lineTo(cx + w * 0.09, ruleY);
+    ctx.stroke();
+    ctx.globalAlpha = cardAlpha;
 
-    // Dynamic auto-measurement: mathematically guarantees labels and values NEVER collide
-    let maxLabelWidth = 0;
-    for (let r = 0; r < rows.length; r++) {
-      const lw = ctx.measureText(rows[r][0]).width;
-      if (lw > maxLabelWidth) maxLabelWidth = lw;
+    // Catalogue number only, set quietly in tracked small-caps beneath the
+    // contour -- no pseudo-Italian attribution line.
+    if (m.catalogue && m.catalogue !== "\u2014") {
+      ctx.fillStyle = inkSoftOf();
+      ctx.font = `${catalogSize}px ${DISPLAY_STACK}`;
+      fillTextTracked(ctx, m.catalogue.toUpperCase(), cx, ruleY + gapRuleCatalog, catalogSize * 0.16);
     }
-    const valueX = margin + maxLabelWidth + Math.max(26, w * 0.025);
 
-    rows.forEach((row, i) => {
-      const y = ruleY + h * 0.055 + i * metaSize * 2.05;
-      ctx.fillStyle = inkSoftOf(); ctx.fillText(row[0], margin, y);
-      ctx.fillStyle = inkOf(); ctx.fillText(row[1], valueX, y);
-    });
-
-    // The plate-mark itself: the settling cue described above, framing the
-    // whole title+metadata block. Silent (alpha 0) at the instant of the
-    // stamp; fully pressed in by STAMP_SETTLE seconds.
-    const frameTop = margin - h * 0.02;
-    const frameBottom = ruleY + h * 0.055 + (rows.length - 1) * metaSize * 2.05 + h * 0.018;
-    drawPlateMark(ctx, margin - h * 0.02, frameTop, w * 0.46, frameBottom - frameTop, settle, view ? view.dpr : 1);
-
-    ctx.fillStyle = inkSoftOf(); ctx.font = mono(metaSize * 0.86);
-    ctx.fillText(m.glyph.caption.toUpperCase(), margin, h - margin * 0.55);
     ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = "source-over";
   }
-
-  const box = { x: w * 0.5, y: h * 0.2, w: w * 0.44, h: h * 0.52 };
-  if (m.glyph.kind === "contour") drawContour(ctx, m.glyph.points, box, view, e, h);
-  else drawMatrixGlyph(ctx, m.glyph, box, cardAlpha, h);
 
   ctx.restore();
   return { scoreAlpha: e, done: u >= 1 };
 }
 
-function drawContour(ctx, points, box, view, e, h) {
-  if (points.length < 2) return;
-  const stroke = Math.max(1.2, h * 0.0032);
+/**
+ * The melodic contour blueprint: a faint 5-line drafting stave laid down
+ * first (7% opacity, bistre ink) -- the guideline a real master draft was
+ * ruled against before a single note went down -- with the taut line of
+ * the opening subject (or theme) drawn over it, its pivot notes marked with
+ * small organic ink beads. Drawn once inside its own card-space bounding
+ * box, then -- as the prologue's `e` carries the title card away -- every
+ * contour point glides in a straight line from that card position onto its
+ * real coordinate on the staves (`gx + (sx - gx) * e`, `gy + (sy - gy) *
+ * e`), so the sketch seamlessly hands off to the actual notes fading in at
+ * the very same instant and place. Bistre ink only, at the ambient card
+ * alpha -- no glow of any kind.
+ *
+ * The line itself is drawn as taut, deliberate, straight-edge quill
+ * drafting vectors directly between consecutive pivot notes -- a master
+ * draftsman's ruled line, not a sagging, rounded curve fit through the
+ * points -- and each segment's own stroke thickness still responds to the
+ * melodic gesture it crosses: a true downward step (the pitch falling) is
+ * drawn like a pen's natural, heaviest downstroke (~1.8px); a leap of a
+ * third or more, or any rising gesture, is drawn like the lighter
+ * upstroke/lift a quill makes crossing back up the page (~0.75px); a
+ * repeated pitch sits at a neutral midpoint between the two. Pivot points
+ * (leaps, suspensions, turns) remain precise, organic ink beads.
+ */
+function drawContour(ctx, glyph, view, boxX, boxY, boxW, boxH, e, cardAlpha) {
+  if (!glyph || glyph.kind !== "contour" || !glyph.points || glyph.points.length < 2 || !view) return;
+  const pts = glyph.points;
 
-  const at = (p) => {
-    const gx = box.x + p.u * box.w;
-    const gy = box.y + (1 - p.v) * box.h;
-    if (!view || e === 0) return [gx, gy];
-    const sx = xOfSec(view, p.sec, 0);
-    const sy = yOfMidi(view, p.midi) + view.rowH / 2;
-    if (e >= 1) return [sx, sy];
-    return [gx + (sx - gx) * e, gy + (sy - gy) * e];
-  };
-
-  const path = (dx, dy) => {
-    ctx.beginPath();
-    for (let i = 0; i < points.length; i++) {
-      const c = at(points[i]);
-      if (i === 0) ctx.moveTo(c[0] + dx, c[1] + dy);
-      else ctx.lineTo(c[0] + dx, c[1] + dy);
-    }
-  };
-
-  ctx.lineJoin = "round"; ctx.lineCap = "round";
-  ctx.strokeStyle = glowOf() + "0.9)";
-  ctx.lineWidth = stroke;
-  path(0, 0);
+  // The drafting stave: five faint, evenly-spaced guideline rules behind
+  // the contour -- an authentic master-draft sketch, not a floating,
+  // unanchored squiggle.
+  ctx.save();
+  ctx.strokeStyle = inkOf();
+  ctx.globalAlpha = cardAlpha * 0.07;
+  ctx.lineWidth = Math.max(0.5, 0.6 / (view.dpr || 1));
+  ctx.beginPath();
+  for (let i = 0; i < 5; i++) {
+    const ly = boxY + (boxH * i) / 4;
+    ctx.moveTo(boxX, ly);
+    ctx.lineTo(boxX + boxW, ly);
+  }
   ctx.stroke();
+  ctx.restore();
 
-  const r = Math.max(1.6, h * 0.0042);
-  for (const p of points) {
-    if (p.pivot === "none") continue;
-    const c = at(p);
+  const mapped = pts.map((p) => {
+    const gx = boxX + p.u * boxW;
+    const gy = boxY + (1 - p.v) * boxH;
+    const sx = xOfSec(view, p.sec, 0);
+    const sy = yOfMidi(view, p.midi);
+    return { x: gx + (sx - gx) * e, y: gy + (sy - gy) * e, pivot: p.pivot };
+  });
+
+  // Taut, deliberate quill drafting vectors: a straight-edge stroke drawn
+  // directly between each pair of consecutive pivot notes, anchored cleanly
+  // over the drafting stave above -- no spline, no bezier, no sagging
+  // rounded loop of any kind.
+  ctx.save();
+  ctx.lineJoin = "miter";
+  ctx.lineCap = "butt";
+  ctx.strokeStyle = inkOf();
+  ctx.globalAlpha = cardAlpha * 0.65;
+  const dpr = view.dpr || 1;
+  for (let i = 0; i < mapped.length - 1; i++) {
+    const p1 = mapped[i];
+    const p2 = mapped[i + 1];
+
+    const interval = pts[i + 1].midi - pts[i].midi;
+    const isLeap = Math.abs(interval) >= 3;
+    const targetW = isLeap || interval > 0 ? 0.75 : interval < 0 ? 1.8 : 1.2;
+    ctx.lineWidth = Math.max(0.5, targetW / dpr);
+
     ctx.beginPath();
-    ctx.arc(c[0], c[1], r, 0, Math.PI * 2);
-    ctx.fillStyle = p.pivot === "suspension" ? THEME.accent : glowOf() + "0.98)";
+    ctx.moveTo(p1.x, p1.y);
+    ctx.lineTo(p2.x, p2.y);
+    ctx.stroke();
+  }
+
+  // Small organic ink beads at the pivot notes only -- leaps, suspensions,
+  // turns -- not one at every point, so they read as marked moments in the
+  // melody rather than a dotted line.
+  ctx.fillStyle = inkOf();
+  for (let i = 0; i < mapped.length; i++) {
+    if (pts[i].pivot === "none") continue;
+    const p = mapped[i];
+    const r = pts[i].pivot === "suspension" ? 2.1 : pts[i].pivot === "leap" ? 1.9 : 1.6;
+    ctx.globalAlpha = cardAlpha * 0.78;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
     ctx.fill();
   }
+  ctx.restore();
 }
 
-function drawMatrixGlyph(ctx, glyph, box, alpha, h) {
-  if (alpha <= 0.004) return;
-  ctx.globalAlpha = alpha;
-  const rowH = box.h / glyph.rows;
-  const cellW = box.w / MATRIX_COLUMNS;
+/**
+ * Manual letter-spaced text -- the canvas equivalent of the CSS small-caps
+ * + tracking treatment used for the deck's own labels elsewhere, since
+ * ctx.font has no reliable cross-browser font-variant support. Used for
+ * both the title (generous but subtle tracking) and the catalogue (tighter,
+ * small-caps-style tracking).
+ */
+function fillTextTracked(ctx, text, cx, y, tracking) {
+  const chars = String(text).split("");
+  const widths = chars.map((c) => ctx.measureText(c).width);
+  const total = widths.reduce((a, b) => a + b, 0) + tracking * Math.max(0, chars.length - 1);
+  const prevAlign = ctx.textAlign;
+  ctx.textAlign = "left";
+  let x = cx - total / 2;
+  chars.forEach((c, i) => {
+    ctx.fillText(c, x, y);
+    x += widths[i] + tracking;
+  });
+  ctx.textAlign = prevAlign;
+}
 
-  ctx.strokeStyle = ruleOf(); ctx.lineWidth = Math.max(1, h * 0.001); ctx.beginPath();
-  for (let r = 0; r <= glyph.rows; r++) {
-    const y = Math.round(box.y + r * rowH) + 0.5;
-    ctx.moveTo(box.x, y); ctx.lineTo(box.x + box.w, y);
-  }
-  ctx.stroke();
-
-  for (const cell of glyph.cells) {
-    ctx.fillStyle = glowOf() + (0.18 + cell.density * 0.72) + ")";
-    ctx.fillRect(box.x + cell.u * box.w, box.y + cell.row * rowH + rowH * 0.22,
-      Math.max(1, cellW * 0.8), rowH * 0.56);
-  }
-  ctx.globalAlpha = 1;
+/**
+ * The title's own letterpress ink-bite: a microscopic (~0.5px) shadow-above,
+ * highlight-below impression, using the exact same convention drawInkBite
+ * applies to every note on the plate, scaled down to typographic size. A
+ * flat fill of glyphs reads as digital text sitting on top of the page; this
+ * dark pass just above and light pass just below the true baseline is what
+ * makes the title read instead as genuinely pressed into the sheet.
+ */
+function fillTitlePressed(ctx, text, cx, y, tracking, dpr) {
+  const bite = Math.max(0.4, 0.5 / (dpr || 1));
+  const mainFill = ctx.fillStyle;
+  ctx.fillStyle = "rgba(20, 14, 8, 0.14)";
+  fillTextTracked(ctx, text, cx, y - bite, tracking);
+  ctx.fillStyle = "rgba(255, 250, 235, 0.12)";
+  fillTextTracked(ctx, text, cx, y + bite, tracking);
+  ctx.fillStyle = mainFill;
+  fillTextTracked(ctx, text, cx, y, tracking);
 }
 
 function wrapText(ctx, text, maxWidth) {
@@ -2123,6 +2724,68 @@ function headroomGain(activeVoices, base) {
   return Math.min(base, base / Math.sqrt(n));
 }
 
+// Chamber early reflections: three discrete taps (not the reverb tail
+// itself) at times a small hall's own geometry would actually produce,
+// alternating left/right so the reflections read as coming off two
+// different walls rather than one repeated echo. REVERB.decay/preDelay
+// above still describe the diffuse LATE tail (this.reverb, below); these
+// are only the room's own first few milliseconds.
+const EARLY_REFLECTIONS = [
+  { delaySec: 0.016, pan: -0.30, gain: 0.22 },
+  { delaySec: 0.028, pan: 0.30, gain: 0.17 },
+  { delaySec: 0.044, pan: -0.16, gain: 0.12 },
+];
+// Steep damping shared by both the early reflections and the late tail --
+// a real room's air and wall absorption eats high frequencies fast, and a
+// single -24dB/octave lowpass at the one point both paths already sum
+// through is cheaper and more physically honest than damping each path
+// separately.
+const WET_DAMP = { frequency: 3000, rolloff: -24, Q: 0.5 };
+
+// Broadcast mastering bus, inserted after the instrument/reverb sum and
+// before the limiter: a touch more soundboard body, a cut where cheap
+// speakers otherwise turn "warm" into "muddy," and a silk-shelf lift in
+// the extreme top for sheen without brittleness -- then a gentle bus
+// compressor to even out the piece's own natural dynamic swings before
+// the limiter does its harder, purely protective job. This stage gain-
+// STAGES toward a commercial loudness target; nothing here is an actual
+// integrated-LUFS meter (that needs K-weighting and gated measurement
+// this file does not implement), so treat -14 LUFS as the aim behind the
+// numbers below, not a guaranteed, measured output.
+const MASTER_EQ = {
+  body: { frequency: 250, gain: 1.8, Q: 1.0 },
+  mud: { frequency: 500, gain: -1.8, Q: 1.1 },
+  silk: { frequency: 10000, gain: 1.0 },
+};
+const MASTER_COMPRESSOR = { ratio: 1.6, threshold: -13, attack: 0.03, release: 0.2 };
+
+// Thematic presence: a Subject or Answer statement (see MOTIF, section 5)
+// gets a +1.8dB LOUDNESS lift in the mix (see AudioEngine.schedule) so the
+// fugue's own main theme cuts through its counter-lines -- converted once
+// here to a linear gain multiplier rather than repeating the dB math per
+// note.
+const THEME_PRESENCE_DB = 1.8;
+const THEME_PRESENCE_GAIN = Math.pow(10, THEME_PRESENCE_DB / 20);
+
+// Human contrapuntal inflection: a strict +/-2.5ms Gaussian jitter on
+// every note's own onset, so a fast contrapuntal passage stops reading as
+// machine-quantized. A fixed, hard-clamped window -- never a looser
+// "feel" -- so ensemble timing never audibly drifts.
+const ONSET_JITTER_SEC = 0.0025;
+
+/**
+ * Box-Muller Gaussian sample, clamped to +/- maxSec. Three standard
+ * deviations comfortably covers the curve's real mass; the explicit clamp
+ * is the actual, non-negotiable ceiling regardless of how the random pair
+ * happens to land.
+ */
+function gaussianJitterSec(maxSec) {
+  const u1 = Math.max(1e-9, Math.random());
+  const u2 = Math.random();
+  const z = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
+  return Math.max(-maxSec, Math.min(maxSec, z * (maxSec / 3)));
+}
+
 let pianoBuffers = null;
 let pianoLoad = null;
 
@@ -2145,6 +2808,7 @@ class AudioEngine {
   constructor() {
     this.channels = new Map();
     this.score = null;
+    this.analysis = null;
     this.scale = 1.0;
     this.started = false;
     this.ready = false;
@@ -2185,21 +2849,65 @@ class AudioEngine {
 
     this.limiter = new Tone.Limiter(-0.5);
     this.drySend.connect(this.master);
+
+    // The damping filter is built unconditionally, before the try below --
+    // it is the one shared landing point for BOTH the discrete early
+    // reflections and the algorithmic late tail, so it needs to exist
+    // regardless of whether Tone.Reverb itself succeeds.
+    this.reverbDamp = new Tone.Filter({
+      type: "lowpass", frequency: WET_DAMP.frequency, rolloff: WET_DAMP.rolloff, Q: WET_DAMP.Q,
+    });
     try {
       this.reverb = new Tone.Reverb({ decay: REVERB.decay, preDelay: REVERB.preDelay, wet: 1.0 });
-      this.reverbDamp = new Tone.Filter({ type: "lowpass", frequency: 3600, Q: 0.5 });
       this.wetSend.connect(this.reverb);
       this.reverb.connect(this.reverbDamp);
-      this.reverbDamp.connect(this.master);
     } catch (err) {
       this.reverb = null;
-      this.reverbDamp = null;
-      // Reverb unavailable -- route the wet send straight to master instead
-      // of losing that portion of the signal entirely.
-      this.wetSend.connect(this.master);
+      // Late tail unavailable -- the early-reflections network below still
+      // reaches the same damped bus, so the room isn't left completely dry.
     }
 
-    this.master.connect(this.limiter);
+    // Chamber early reflections: three discrete delay taps feeding the SAME
+    // damped wet bus as the late tail above, each panned to its own side so
+    // they read as distinct early wall reflections rather than one repeated
+    // slap-back. Plain Delay/Panner/Gain nodes never fail to construct
+    // (unlike Tone.Reverb above), so this network exists even in the rare
+    // environment where the convolution-based tail does not.
+    this.earlyReflections = EARLY_REFLECTIONS.map((tap) => {
+      const delay = new Tone.Delay(tap.delaySec);
+      const pan = new Tone.Panner(tap.pan);
+      const gain = new Tone.Gain(tap.gain);
+      this.wetSend.connect(delay);
+      delay.connect(pan);
+      pan.connect(gain);
+      gain.connect(this.reverbDamp);
+      return { delay, pan, gain };
+    });
+    this.reverbDamp.connect(this.master);
+
+    // Broadcast mastering bus: master EQ, then a gentle bus compressor,
+    // then the existing brick-wall limiter -- in that order, so the EQ and
+    // compressor shape the piece's own dynamics before the limiter's purely
+    // protective ceiling ever engages. See MASTER_EQ / MASTER_COMPRESSOR
+    // above for the honest caveat on what "-14 LUFS" means here.
+    this.masterEqBody = new Tone.Filter({
+      type: "peaking", frequency: MASTER_EQ.body.frequency, gain: MASTER_EQ.body.gain, Q: MASTER_EQ.body.Q,
+    });
+    this.masterEqMud = new Tone.Filter({
+      type: "peaking", frequency: MASTER_EQ.mud.frequency, gain: MASTER_EQ.mud.gain, Q: MASTER_EQ.mud.Q,
+    });
+    this.masterEqSilk = new Tone.Filter({
+      type: "highshelf", frequency: MASTER_EQ.silk.frequency, gain: MASTER_EQ.silk.gain,
+    });
+    this.masterCompressor = new Tone.Compressor({
+      ratio: MASTER_COMPRESSOR.ratio, threshold: MASTER_COMPRESSOR.threshold,
+      attack: MASTER_COMPRESSOR.attack, release: MASTER_COMPRESSOR.release,
+    });
+    this.master.connect(this.masterEqBody);
+    this.masterEqBody.connect(this.masterEqMud);
+    this.masterEqMud.connect(this.masterEqSilk);
+    this.masterEqSilk.connect(this.masterCompressor);
+    this.masterCompressor.connect(this.limiter);
     this.limiter.connect(this.monitor);
     this.monitor.toDestination();
 
@@ -2433,11 +3141,13 @@ class AudioEngine {
     }
     this.channels.clear();
     this.score = null;
+    this.analysis = null;
   }
 
-  load(score) {
+  load(score, analysis) {
     this.teardown();
     this.score = score;
+    this.analysis = analysis || null;
     const n = score.voices.length;
     score.voices.forEach((voice, i) => {
       const gain = new Tone.Gain(1).connect(this.busIn);
@@ -2473,16 +3183,31 @@ class AudioEngine {
       if (!ch) continue;
       const events = voice.notes.map((n) => {
         const dur = Math.max(0.06, (n.endSec - n.startSec) / this.scale);
+        // Preserve the source file's own dynamics. A small floor (silent
+        // notes are never useful) and a gentle presence lift are kept, but
+        // the shape of the source dynamics survives across nearly the
+        // whole range.
+        const vel = Math.max(0.08, Math.min(1.0, (n.vel || 0.72) * 1.05 + 0.04));
+        // Thematic presence: a Subject or Answer statement gets a +1.8dB
+        // LOUDNESS lift (THEME_PRESENCE_GAIN) applied only to the trigger
+        // velocity actually used for amplitude below. The velocity fed to
+        // the timbre filters stays this note's real, unboosted `vel`, so a
+        // thematic statement cuts through the texture without also
+        // sounding artificially brighter than it was actually struck.
+        const motif = this.analysis && this.analysis.motifOf ? this.analysis.motifOf[n.id] : undefined;
+        const isTheme = motif === MOTIF.SUBJECT || motif === MOTIF.ANSWER;
+        const triggerVel = isTheme ? Math.min(1.0, vel * THEME_PRESENCE_GAIN) : vel;
         return {
-          time: n.startSec / this.scale,
+          // Human contrapuntal inflection: a strict, hard-clamped +/-2.5ms
+          // Gaussian jitter on the note's own onset (see gaussianJitterSec)
+          // -- fast contrapuntal runs stop reading as machine-quantized
+          // without drifting far enough to feel like mistimed ensemble.
+          time: Math.max(0, n.startSec / this.scale + gaussianJitterSec(ONSET_JITTER_SEC)),
           midi: n.midi,
           note: Tone.Frequency(n.midi, "midi").toNote(),
           dur,
-          // Preserve the source file's own dynamics. A small floor (silent
-          // notes are never useful) and a gentle presence lift are kept, but
-          // the shape of the source dynamics survives across nearly the
-          // whole range.
-          vel: Math.max(0.08, Math.min(1.0, (n.vel || 0.72) * 1.05 + 0.04)),
+          vel,
+          triggerVel,
           release: this.releaseFor(dur, cfg.kind === "sampler" ? cfg.release : 0),
         };
       });
@@ -2500,7 +3225,7 @@ class AudioEngine {
             if (!stop.synth || stop.synth.disposed) continue;
             try {
               const note = Tone.Frequency(ev.midi + stop.semitones, "midi").toNote();
-              stop.synth.triggerAttackRelease(note, ev.dur, time, ev.vel);
+              stop.synth.triggerAttackRelease(note, ev.dur, time, ev.triggerVel);
             } catch (err) {}
           }
           return;
@@ -2521,7 +3246,7 @@ class AudioEngine {
         }
         try {
           if (ev.release > 0 && "release" in inst) inst.release = ev.release;
-          inst.triggerAttackRelease(ev.note, ev.dur, time, ev.vel);
+          inst.triggerAttackRelease(ev.note, ev.dur, time, ev.triggerVel);
         } catch (err) {}
       }, events);
       part.start(0);
@@ -2566,11 +3291,14 @@ class AudioEngine {
   releaseAll() { for (const ch of this.channels.values()) this.releaseChannel(ch); }
   dispose() {
     this.teardown();
-    for (const node of [this.busIn, this.bodyBoost, this.antiMud, this.airShelf,
-      this.drySend, this.wetSend, this.reverb, this.reverbDamp, this.limiter,
-      this.master, this.monitor]) {
-      if (node) node.dispose();
+    const nodes = [this.busIn, this.bodyBoost, this.antiMud, this.airShelf,
+      this.drySend, this.wetSend, this.reverb, this.reverbDamp,
+      this.masterEqBody, this.masterEqMud, this.masterEqSilk, this.masterCompressor,
+      this.limiter, this.master, this.monitor];
+    if (this.earlyReflections) {
+      for (const tap of this.earlyReflections) nodes.push(tap.delay, tap.pan, tap.gain);
     }
+    for (const node of nodes) if (node) node.dispose();
   }
 }
 
@@ -2668,6 +3396,7 @@ class Renderer {
     this.densityEMA = 0;
     this.lastFrameNow = performance.now();
     this.tensionBuf = [];
+    this.dividerBuf = [];
     this.aspectMode = "landscape";
     this.lastPullBack = 0;
     this.win = { start: 0, end: 0 };
@@ -2778,7 +3507,11 @@ class Renderer {
     this.paper = null;
     this.staticDirty = true;
 
-    const fadeWidth = 32;
+    // Narrow margin edge fade: a tight, crisp terminal absorption right at
+    // the very edge of the plate (14px), not a wide bleached fog eating
+    // into the reading window -- notes stay dark, solid, and fully legible
+    // all the way out to within this last sliver of the margin.
+    const fadeWidth = 14;
     const leftFade = this.dynamicCtx.createLinearGradient(this.view.left, 0, this.view.left + fadeWidth, 0);
     leftFade.addColorStop(0, "rgba(0,0,0,1)");
     leftFade.addColorStop(1, "rgba(0,0,0,0)");
@@ -2892,6 +3625,22 @@ class Renderer {
 
     let drawn = 0, sounding = 0, voicesSounding = 0;
     this.tensionBuf.length = 0;
+    this.dividerBuf.length = 0;
+
+    // Cursors are advanced once, up front, so the cross-voice collision scan
+    // below and the actual per-voice draw pass see exactly the same visible
+    // note set -- rather than the scan running against stale cursors from
+    // the previous frame while the draw loop advances its own copy live.
+    for (let vi = 0; vi < score.voices.length; vi++) {
+      const voice = score.voices[vi];
+      if (!voice) continue;
+      const margin = ws - this.maxDur[vi];
+      let cursor = this.cursors[vi];
+      if (rewound) cursor = lowerBoundSec(voice.notes, margin);
+      else while (cursor < voice.notes.length && voice.notes[cursor].startSec < margin) cursor++;
+      this.cursors[vi] = cursor;
+    }
+    const collisions = analyzeNoteCollisions(score, this.cursors, ws, we);
 
     // Strict boundary clipping: ensures thick woodblock slugs never leak outside margins
     ctx.save();
@@ -2905,27 +3654,23 @@ class Renderer {
       const voice = score.voices[vi];
       const sc = this.scratch[vi];
       if (!voice || !sc || !voice.palette) continue;
-      const margin = ws - this.maxDur[vi];
-      let cursor = this.cursors[vi];
-      if (rewound) cursor = lowerBoundSec(voice.notes, margin);
-      else while (cursor < voice.notes.length && voice.notes[cursor].startSec < margin) cursor++;
-      this.cursors[vi] = cursor;
 
-      drawVoiceNotes(ctx, voice, view, t, cursor, ws, we, this.state, sc, this.out, this.tensionBuf);
+      drawVoiceNotes(ctx, voice, view, t, this.cursors[vi], ws, we, this.state, sc, this.out, this.tensionBuf, collisions, this.dividerBuf);
       drawn += this.out.drawn;
       sounding += this.out.sounding;
       if (this.out.sounding > 0) voicesSounding++;
     }
 
     drawCapillaryTension(ctx, this.tensionBuf, view.dpr);
+    drawUnisonDividers(ctx, this.dividerBuf, view.dpr);
 
     // Soft Edge Fading inside plate bounds only
     if (this.leftFade && this.rightFade) {
       ctx.globalCompositeOperation = "destination-out";
       ctx.fillStyle = this.leftFade;
-      ctx.fillRect(view.left, view.top - 6, 32, view.innerH + 12);
+      ctx.fillRect(view.left, view.top - 6, 14, view.innerH + 12);
       ctx.fillStyle = this.rightFade;
-      ctx.fillRect(view.right - 32, view.top - 6, 32, view.innerH + 12);
+      ctx.fillRect(view.right - 14, view.top - 6, 14, view.innerH + 12);
     }
     ctx.restore();
 
@@ -3163,6 +3908,14 @@ class VideoExport {
       this.report("Cannot export yet — the plate has not finished laying out.");
       return;
     }
+    // A clean 16:9 target derived from the current display's own height,
+    // rather than the old `stage.clientWidth x stage.clientHeight`, which is
+    // whatever arbitrary aspect ratio the browser window happens to be at
+    // the moment of export and bakes the on-screen letterbox bars into the
+    // exported file. composite() now crops to the live plate region using
+    // this.fit, so pairing that with a guaranteed-16:9 target here is what
+    // actually produces a clean export -- fixing only one side of this would
+    // still leave a distorted result.
     // A clean target resolution derived explicitly from the selected aspect
     // ratio -- never from the raw stage.clientWidth/clientHeight, which is
     // whatever pixel size the browser happens to be rendering at and would
@@ -3306,7 +4059,7 @@ class Session {
     this.reset();
     const analysis = analyze(score);
 
-    this.engine.load(score);
+    this.engine.load(score, analysis);
     this.engine.seek(0);
     this.store.set({ score, analysis, playing: false });
     this.engine.applyMix(() => true);
@@ -3546,9 +4299,9 @@ class Deck {
       // A quiet plate-mark frame behind the stamp, exactly the same bevel
       // convention as every note and the opening title card -- not a solid
       // box, which would look like a caption bar pasted on top.
-      ctx.fillStyle = "rgba(244, 238, 221, 0.82)";
+      ctx.fillStyle = "rgba(250, 247, 238, 0.82)";
       ctx.fillRect(pad - titleSize * 0.5, targetH - pad - titleSize * 1.5, tw + titleSize, titleSize * 2.1);
-      ctx.fillStyle = "rgba(36, 33, 29, 0.92)";
+      ctx.fillStyle = "rgba(42, 36, 33, 0.92)";
       ctx.fillText(label, pad, targetH - pad - titleSize * 0.35);
       ctx.restore();
     }
@@ -3647,6 +4400,14 @@ class Deck {
     });
   }
 
+  /**
+   * Loads a dropped or picked file. The presentation stays clean fine art
+   * throughout: on success, nothing is printed to the screen at all -- no
+   * filename, no track count, no note count -- since a museum plate never
+   * annotates itself with its own parsing statistics. Only genuine problems
+   * (an unreadable file) still surface a message, because that is
+   * necessary feedback rather than telemetry.
+   */
   async loadFile(file) {
     if (this.busy) return;
     this.busy = true;
@@ -3654,14 +4415,11 @@ class Deck {
     this.setStatus(`Loading ${file.name}\u2026`, "");
     try {
       const buffer = await this.readLocalFile(file);
-      const d = this.session.openBuffer(buffer, file.name, {});
-      const shape = d.singleLayer ? "1 voice, single layer" : `${d.voiceCount} voices / ${d.voicedTrackCount} tracks`;
-      this.setStatus(`${file.name} \u2014 Type ${d.format}, ${shape}, ${d.noteCount} notes`, "ok");
-      this.renderer.console.push("FILE", `${file.name} \u2014 SMF type ${d.format}`);
+      this.session.openBuffer(buffer, file.name, {});
+      this.setStatus("", "");
     } catch (err) {
       this.session.reset();
       this.setStatus(err && err.message ? err.message : "Unreadable file.", "error");
-      this.renderer.console.push("ERROR", err && err.message ? err.message.slice(0, 46) : "unreadable file");
     } finally { this.busy = false; }
   }
 
@@ -3835,6 +4593,7 @@ function boot() {
     store, engine, renderer, session, video, deck,
     analyze, estimateKey, buildScore, ingestMidi, validateScore,
     buildMonogram, drawMonogram, layoutView, xOfSec, yOfMidi,
+    cleanTitle, extractCatalogue,
     THEMES, applyTheme: (id) => applyTheme(id, store, renderer, session),
   };
 }
